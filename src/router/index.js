@@ -1,19 +1,30 @@
 // src/router/index.js
-import { createRouter, createWebHistory } from 'vue-router';
 import HomeView from '@/pages/home/index.vue';
+import OverView from '@/pages/overview/index.vue';
+import Terminal from '@/pages/terminal/Terminal.vue';
 
 const routes = [
-  {
-    path: '/',
-    name: 'Home',
-    component: HomeView,
-  },
-  // 更多页面路由...
+    {
+        path: '/',
+        name: 'Home',
+        component: HomeView,
+    },
+    {
+        path: '/overview',
+        name: 'Overview',
+        component: OverView,
+    },
+    {
+        path: '/terminal',
+        name: 'Terminal',
+        component: Terminal,
+    },
+
 ];
 
 const router = createRouter({
-  history: createWebHistory(),
-  routes,
+    history: createWebHistory(),
+    routes,
 });
 
 export default router;
