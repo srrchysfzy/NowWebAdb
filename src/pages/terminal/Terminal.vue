@@ -48,7 +48,7 @@ const initTr = async () => {
     }),
   );
 }
-const termData = (process) => {
+const termData = async (process) => {
   const writer = process.stdin.getWriter();
   term.value.onData((data) => {
     const buffer = encodeUtf8(data);
