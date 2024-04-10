@@ -21,7 +21,8 @@
             <SvgIcon icon="EarthIcon" :color="'#66b1ff'" :style="{ width:18 + 'px', height: 18 + 'px'}"/>
             <span style="font-size: 16px"> IP地址</span>
           </el-space>
-          <div class="mt-3">{{ deviceIp }}</div>
+          <div v-if="deviceIp" class="mt-3">{{ deviceIp }}</div>
+          <div v-else class="mt-3">获取中···</div>
         </el-col>
         <el-col :span="12" class="mb-4">
           <el-space>
@@ -69,14 +70,36 @@
             <span />
           </el-progress>
         </el-col>
+        <el-col :span="12" class="mb-4">
+          <el-space>
+            <SvgIcon icon="ScreenIcon" :color="'#66b1ff'" :style="{ width:16 + 'px', height: 16 + 'px'}"/>
+            <span class="mx-1" style="font-size: 16px">屏幕尺寸</span>
+          </el-space>
+          <div class="mt-3">{{ deviceScreenSize }}</div>
+        </el-col>
+        <el-col :span="12" class="mb-4">
+          <el-space>
+            <el-icon :size="18" color="#66b1ff"><Iphone /></el-icon>
+            <span style="font-size: 16px"> 序列号</span>
+          </el-space>
+          <div class="mt-3">{{ deviceSerialno }}</div>
+        </el-col>
+        <el-col :span="12" class="mb-4">
+          <el-space>
+            <SvgIcon icon="FrameworkIcon" :color="'#66b1ff'" :style="{ width:18 + 'px', height: 18 + 'px'}"/>
+            <span style="font-size: 16px"> 设备Abi</span>
+          </el-space>
+          <div class="mt-3">{{ deviceAbi }}</div>
+        </el-col>
+        <el-col :span="12" class="mb-4">
+          <el-space>
+            <SvgIcon icon="CpuIcon" :color="'#66b1ff'" :style="{ width:18 + 'px', height: 18 + 'px'}"/>
+            <span style="font-size: 16px"> CPU信息</span>
+          </el-space>
+          <div class="mt-3">{{ deviceCpuBrand }}<code>{{ deviceCpuCore }}</code> 核</div>
+        </el-col>
+        
       </el-row>
-      <!--      <el-descriptions :column="1" style="margin-top: 20px;border-radius: 12px;" border>-->
-      <!--        <el-descriptions-item label="系统版本">Android 11</el-descriptions-item>-->
-      <!--        <el-descriptions-item label="分辨率">1080*1920</el-descriptions-item>-->
-      <!--        <el-descriptions-item label="内存">4G</el-descriptions-item>-->
-      <!--        <el-descriptions-item label="架构">arm64-v8a</el-descriptions-item>-->
-      <!--        <el-descriptions-item label="温度">30℃</el-descriptions-item>-->
-      <!--      </el-descriptions>-->
     </el-col>
   </el-row>
 </template>
@@ -87,11 +110,13 @@ import useWindowResize from "@/assets/js/useWindowResize.js";
 import SvgIcon from "@/components/SvgIcon.vue";
 import {AdbSubprocessNoneProtocol} from "@yume-chan/adb";
 import {DecodeUtf8Stream} from "@yume-chan/stream-extra";
+import {Iphone} from "@element-plus/icons-vue";
 
 const {width, height} = useWindowResize();
 const adbObject = computed(() => {
   return getAdbInstance()
 });
+const intervalId = ref();
 const deviceNowImg = ref('')
 const deviceVersion = ref('')
 const deviceBatteryVoltage = ref('')
@@ -103,7 +128,11 @@ const deviceStorageUsedRate = ref('50%')
 const deviceMemoryTotal = ref('4G')
 const deviceMemoryUsed = ref('2G')
 const deviceMemoryUsedRate = ref('50%')
-
+const deviceScreenSize = ref('1080*1920')
+const deviceSerialno = ref('')
+const deviceAbi = ref('')
+const deviceCpuCore = ref('')
+const deviceCpuBrand = ref('')
 
 const getDevice = async () => {
   let adb = adbObject.value
@@ -136,8 +165,13 @@ const getDevice = async () => {
   deviceStorageUsedRate.value = storageRes.usedRate
   const memoryRes = await deviceMemory()
   deviceMemoryTotal.value = memoryRes.total
-  deviceMemoryUsed.value = memoryRes.used
+  deviceMemoryUsed.value = memoryRes.used.toFixed(2)
   deviceMemoryUsedRate.value = memoryRes.usedRate
+  deviceScreenSize.value = await getDeviceScreenSize()
+  deviceSerialno.value = await getDeviceSerialno()
+  deviceAbi.value = await getDeviceAbi()
+  deviceCpuCore.value = await getDeviceCpuCore()
+  deviceCpuBrand.value = await getDeviceCpuBrand()
 }
 const executeCommand = async (command) => {
   if (!adbObject.value) {
@@ -212,11 +246,6 @@ const deviceMemory = async () => {
     return '';
   }
 }
-
-onMounted(() => {
-  console.log('mounted')
-  getDevice()
-})
 const wifiInfo = async () => {
   const res = await executeCommand('cmd wifi status');
   if (res) {
@@ -237,6 +266,59 @@ const getDeviceIp = async () => {
     return '';
   }
 }
+const getDeviceScreenSize = async () => {
+  const res = await executeCommand('wm size');
+  if (res) {
+    const sizeRegex = /\b\d{3,4}x\d{3,4}\b/;
+    const sizeMatch = res.match(sizeRegex);
+    return sizeMatch ? sizeMatch[0] : null
+  } else {
+    return '';
+  }
+}
+const getDeviceSerialno = async () => {
+  const res = await executeCommand('getprop ro.boot.serialno');
+  if (res) {
+    return res
+  } else {
+    return '';
+  }
+}
+const getDeviceAbi = async () => {
+  const res = await executeCommand('getprop ro.product.cpu.abi');
+  if (res) {
+    return res
+  } else {
+    return '';
+  }
+}
+const getDeviceCpuCore = async () => {
+  const res = await executeCommand('grep \'^processor\' /proc/cpuinfo | wc -l');
+  if (res) {
+    return res
+  } else {
+    return '';
+  }
+}
+const getDeviceCpuBrand = async () => {
+  const res = await executeCommand('grep \'^Hardware\' /proc/cpuinfo');
+  if (res) {
+    return res.split(':')[1]
+  } else {
+    return '';
+  }
+}
+// 启动一个定时器，每10s执行一次getDevice函数
+onMounted(() => {
+  console.log('mounted')
+  intervalId.value = setInterval(getDevice, 10000);
+  getDevice()
+})
+onUnmounted(() => {
+  console.log('unmounted')
+  // 清除定时器
+  clearInterval(intervalId.value);
+})
 </script>
 <style scoped>
 
