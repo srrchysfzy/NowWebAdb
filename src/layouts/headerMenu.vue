@@ -11,7 +11,7 @@
     <el-menu-item index="overview">
       <span class="fw-bold fs-6">概览</span>
     </el-menu-item>
-    <el-menu-item index="1">
+    <el-menu-item index="fileManage">
       <span class="fw-bold fs-6">文件管理器</span>
     </el-menu-item>
     <el-menu-item index="2">
@@ -46,7 +46,7 @@ import BatteryIcon from "@/components/BatteryIcon.vue";
 import TemperatureIcon from "@/components/TemperatureIcon.vue";
 import {Switch} from "@element-plus/icons-vue";
 // import {useDeviceStore} from "@/stores/device.js";
-import {getAdbInstance} from "@/assets/js/adbManager.js";
+import {getAdbInstance, executeCommand} from "@/assets/js/adbManager.js";
 import {DecodeUtf8Stream} from "@yume-chan/stream-extra";
 import {AdbSubprocessNoneProtocol} from "@yume-chan/adb";
 
@@ -97,32 +97,6 @@ const getBatteryInfo = async () => {
     battery.value = Number(res.level)
   }
 }
-const executeCommand = async (command) => {
-  if (!adbObject.value) {
-    return;
-  }
-  try {
-    const process = await adbObject.value.subprocess.spawn(command, {
-      protocols: [AdbSubprocessNoneProtocol],
-    });
-    let chunks
-    const decodeStream = new DecodeUtf8Stream();
-    
-    await process.stdout.pipeThrough(decodeStream).pipeTo(
-      new WritableStream({
-        write(chunk) {
-          chunks = chunk
-        },
-      })
-    );
-    await process.kill();
-    return chunks;
-  } catch (error) {
-    console.error('执行命令出错:', error);
-    return ''
-  }
-};
-
 const handleSelect = () => {
   console.log('select')
 }

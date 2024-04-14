@@ -1,6 +1,7 @@
 // src/router/index.js
 import HomeView from '@/pages/home/index.vue';
 import OverView from '@/pages/overview/index.vue';
+import FileManage from "@/pages/fileManage/fileManage.vue";
 import Terminal from '@/pages/terminal/Terminal.vue';
 
 const routes = [
@@ -13,6 +14,11 @@ const routes = [
         path: '/overview',
         name: 'Overview',
         component: OverView,
+    },
+    {
+        path: '/fileManage',
+        name: 'FileManage',
+        component: FileManage,
     },
     {
         path: '/terminal',

@@ -7,6 +7,7 @@ export {}
 declare global {
   const AdbDaemonWebUsbDeviceManager: typeof import('@yume-chan/adb-daemon-webusb/AdbDaemonWebUsbDeviceManager')['AdbDaemonWebUsbDeviceManager']
   const EffectScope: typeof import('vue')['EffectScope']
+  const ElMessageBox: typeof import('element-plus/es')['ElMessageBox']
   const ElNotification: typeof import('element-plus/es')['ElNotification']
   const WebUSB: typeof import('usb/WebUSB')['WebUSB']
   const computed: typeof import('vue')['computed']
