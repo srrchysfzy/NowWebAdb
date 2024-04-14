@@ -104,12 +104,9 @@
   </el-row>
 </template>
 <script setup>
-import {useDeviceStore} from "@/stores/device.js";
-import {getAdbInstance} from "@/assets/js/adbManager.js";
+import {getAdbInstance, executeCommand} from "@/assets/js/adbManager.js";
 import useWindowResize from "@/assets/js/useWindowResize.js";
 import SvgIcon from "@/components/SvgIcon.vue";
-import {AdbSubprocessNoneProtocol} from "@yume-chan/adb";
-import {DecodeUtf8Stream} from "@yume-chan/stream-extra";
 import {Iphone} from "@element-plus/icons-vue";
 
 const {width, height} = useWindowResize();
@@ -173,31 +170,6 @@ const getDevice = async () => {
   deviceCpuCore.value = await getDeviceCpuCore()
   deviceCpuBrand.value = await getDeviceCpuBrand()
 }
-const executeCommand = async (command) => {
-  if (!adbObject.value) {
-    return;
-  }
-  try {
-    const process = await adbObject.value.subprocess.spawn(command, {
-      protocols: [AdbSubprocessNoneProtocol],
-    });
-    let chunks
-    const decodeStream = new DecodeUtf8Stream();
-    
-    await process.stdout.pipeThrough(decodeStream).pipeTo(
-      new WritableStream({
-        write(chunk) {
-          chunks = chunk
-        },
-      })
-    );
-    await process.kill();
-    return chunks;
-  } catch (error) {
-    console.error('执行命令出错:', error);
-    return ''
-  }
-};
 const batteryVoltage = async () => {
   const res = await executeCommand('dumpsys battery | grep voltage');
   if (res) {
