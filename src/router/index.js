@@ -2,6 +2,7 @@
 import HomeView from '@/pages/home/index.vue';
 import OverView from '@/pages/overview/index.vue';
 import FileManage from "@/pages/fileManage/fileManage.vue";
+import AppManage from "@/pages/appManage/appManage.vue";
 import Terminal from '@/pages/terminal/Terminal.vue';
 
 const routes = [
@@ -19,6 +20,11 @@ const routes = [
         path: '/fileManage',
         name: 'FileManage',
         component: FileManage,
+    },
+    {
+        path: '/appManage',
+        name: 'AppManage',
+        component: AppManage,
     },
     {
         path: '/terminal',

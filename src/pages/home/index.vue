@@ -85,19 +85,16 @@ const connectDevice = async () => {
   const device = await Manager.requestDevice()
   connectStatus.value = 'connected'
   if (device) {
-    console.log(device)
     devicesName.value = device.name
     const connection = await device.connect();
-    console.log(connection)
     const CredentialStore = new AdbWebCredentialStore();
-    console.log(CredentialStore)
     const transport = await AdbDaemonTransport.authenticate({
       serial: device.serial,
       connection,
       credentialStore: CredentialStore,
     });
-    console.log(transport)
     const adb = new Adb(transport);
+    console.log(adb)
     setAdbInstance(adb)
     // console.log(adb)
     // console.log(adb.banner)

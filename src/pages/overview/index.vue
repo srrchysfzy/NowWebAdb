@@ -104,7 +104,7 @@
   </el-row>
 </template>
 <script setup>
-import {getAdbInstance, executeCommand} from "@/assets/js/adbManager.js";
+import {executeCommand, getAdbInstance} from "@/assets/js/adbManager.js";
 import useWindowResize from "@/assets/js/useWindowResize.js";
 import SvgIcon from "@/components/SvgIcon.vue";
 import {Iphone} from "@element-plus/icons-vue";
@@ -133,7 +133,6 @@ const deviceCpuBrand = ref('')
 
 const getDevice = async () => {
   let adb = adbObject.value
-  console.log(adb)
   deviceVersion.value = await adb.getProp("ro.build.version.release");
   const screenshot = await adb.framebuffer();
   const canvas = document.createElement("canvas");
@@ -149,9 +148,7 @@ const getDevice = async () => {
     screenshot.height,
   );
   context.putImageData(imageData, 0, 0);
-  const url = canvas.toDataURL();
-  console.log(url)
-  deviceNowImg.value = url
+  deviceNowImg.value = canvas.toDataURL()
   const batteryRes = await batteryVoltage();
   deviceBatteryVoltage.value = batteryRes ? batteryRes.split(':')[1] : '--'
   deviceWifi.value = await wifiInfo()
