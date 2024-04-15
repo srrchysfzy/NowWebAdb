@@ -14,7 +14,7 @@
     <el-menu-item index="fileManage">
       <span class="fw-bold fs-6">文件管理器</span>
     </el-menu-item>
-    <el-menu-item index="2">
+    <el-menu-item index="appManage">
       <span class="fw-bold fs-6">应用管理器</span>
     </el-menu-item>
     <el-menu-item index="3">
