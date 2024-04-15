@@ -103,9 +103,6 @@ defineExpose({
     drawerDisplay.value = true;
     nowFileInfo.value = fileInfo;
   },
-  closeDrawer() {
-    drawerDisplay.value = false;
-  }
 })
 </script>
 <style scoped>
