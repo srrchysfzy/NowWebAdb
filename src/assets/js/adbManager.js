@@ -20,23 +20,27 @@ export async function executeCommand(command) {
         const process = await adbInstance.subprocess.spawn(command, {
             protocols: [AdbSubprocessNoneProtocol],
         });
-        let chunks
-        const decodeStream = new DecodeUtf8Stream();
 
-        await process.stdout.pipeThrough(decodeStream).pipeTo(
-            new WritableStream({
-                write(chunk) {
-                    chunks = chunk
-                },
-            })
-        );
+        const reader = process.stdout.getReader();
+        const chunks = [];
+        let decoder = new TextDecoder();
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            chunks.push(decoder.decode(value, { stream: true }));
+        }
+
         await process.kill();
-        return chunks;
+        const output = chunks.join('');
+        return output;
     } catch (error) {
         console.error('执行命令出错:', error);
-        return ''
+        return '';
     }
 }
+
+
 // 计算文件大小
 export function formatSize(size) {
     if (size < 1024) {

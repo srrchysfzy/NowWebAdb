@@ -389,7 +389,7 @@ const getFileDetail = async (fileName) => {
     nowDirPath = dirPathName.value + '/' + fileName
   }
   console.log(nowDirPath)
-  const res = await executeCommand('stat ' + nowDirPath)
+  const res = await executeCommand(`stat '${nowDirPath}'`)
   const accessRegex = /Access:\s*\(([^)]*)\)/;
   const gidRegex = /Gid:\s*\(\s*\d+\/([^)]*)\)/;
   
