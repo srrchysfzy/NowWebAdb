@@ -1,5 +1,4 @@
 import {AdbSubprocessNoneProtocol} from "@yume-chan/adb";
-import {DecodeUtf8Stream} from "@yume-chan/stream-extra";
 
 let adbInstance = null;
 
@@ -32,8 +31,7 @@ export async function executeCommand(command) {
         }
 
         await process.kill();
-        const output = chunks.join('');
-        return output;
+        return chunks.join('');
     } catch (error) {
         console.error('执行命令出错:', error);
         return '';

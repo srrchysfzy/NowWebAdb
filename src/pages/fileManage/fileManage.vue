@@ -19,9 +19,11 @@
         </el-space>
       </el-space>
       <el-space>
-        <el-icon style="cursor: pointer" :size="20">
+        <el-icon v-if="showSearchIcon" key="icon" style="cursor: pointer" :size="20" @click="showSearchIcon=false">
           <Search/>
         </el-icon>
+        <el-input v-else key="input" v-model="searchValue" placeholder="搜索当前目录下文件/文件夹" size="small"
+                  style="min-width: 200px" clearable @change="searchFile" @input="searchFile"/>
         <el-icon style="cursor: pointer" :size="20" class="mx-2" @click="getFileList('')">
           <Refresh/>
         </el-icon>
@@ -70,7 +72,8 @@
         </template>
       </el-upload>
       <el-space
-        :style="selectStatus === 3 || selectStatus === 2 || selectStatus === 1?{cursor: 'pointer'}:{color: '#a8a8a8',cursor: 'not-allowed'}" @click="topDownloadFile">
+        :style="selectStatus === 3 || selectStatus === 2 || selectStatus === 1?{cursor: 'pointer'}:{color: '#a8a8a8',cursor: 'not-allowed'}"
+        @click="topDownloadFile">
         <SvgIcon icon="DownloadIcon"/>
         <span>下载</span>
       </el-space>
@@ -91,7 +94,13 @@
         <span>详细信息</span>
       </el-space>
     </el-space>
-    <div class="card mt-4">
+    <div id="showFileCard" class="card mt-4" :class="{ 'drag-over': isDragging }"
+         @dragover.prevent="handleDragOver"
+         @dragleave="handleDragLeave"
+         @drop.prevent="handleDrop">
+      <div class="overlay" v-if="isDragging">
+        将文件拖动到此处
+      </div>
       <div class="card-header">
         <el-row :gutter="10">
           <el-col :span="12">
@@ -111,8 +120,11 @@
               </el-icon>
               
               <span>名称</span>
-              <el-icon :size="18" style="cursor: pointer">
+              <el-icon v-if="sortType === 'desc'" :size="18" style="cursor: pointer" @click="sortFileList('asc')">
                 <Bottom/>
+              </el-icon>
+              <el-icon v-else :size="18" style="cursor: pointer;margin-top: 3px" @click="sortFileList('desc')">
+                <Top/>
               </el-icon>
             </el-space>
           </el-col>
@@ -159,7 +171,7 @@
                 </el-space>
               </el-col>
               <el-col :span="12">
-                <span v-if="fileItem.numType === 8">{{ formatSize(fileItem.size) }}</span>
+                <span v-if="fileItem.numType === 8">{{ fileItem.size }}</span>
                 <span v-else>--</span>
                 <div style="margin-left: 100px; margin-top: -24px" class="d-flex justify-content-between">
                   <span>{{ fileItem.createTime }}</span>
@@ -175,7 +187,7 @@
                       </el-icon>
                     </template>
                     <template #default>
-                      <el-space class="operationItemCss" @click="downloadFile(fileItem.name)">
+                      <el-space class="operationItemCss" @click="rightDownloadFile(fileItem.name, fileItem.numType)">
                         <SvgIcon style="margin-left: 9px" icon="DownloadIcon"/>
                         <span class="mx-2">下载</span>
                       </el-space>
@@ -214,14 +226,13 @@ import {
   More,
   Refresh,
   RemoveFilled,
-  Search,
+  Search, Top,
 } from "@element-plus/icons-vue";
 import SvgIcon from "@/components/SvgIcon.vue";
 import {getAdbInstance, executeCommand, formatSize} from "@/assets/js/adbManager.js";
 import useWindowResize from "@/assets/js/useWindowResize.js";
 import FileDetailDrawer from "@/pages/fileManage/fileDetailDrawer.vue";
 import {Consumable} from "@yume-chan/stream-extra";
-import {encodeUtf8} from "@yume-chan/adb";
 
 let syncObject
 let imgType = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg', 'ico', 'psd', 'raw', 'heif']
@@ -235,6 +246,11 @@ const fileItemList = ref([])
 const fileDetailDrawerRef = ref(null)
 const upFileRef = ref(null)
 const nowFileInfo = ref({})
+const sortType = ref('asc')
+const showSearchIcon = ref(true)
+const searchValue = ref('')
+const isDragging = ref(false)
+const copyFileList = ref([])
 
 const nowDir = computed(() => {
   // 先判断路径是不是只有'/'，如果不是则用'/'切割路径字符串，获取最后一个元素
@@ -298,13 +314,21 @@ const getFileList = async (filePath) => {
     fileItemList.value.push({
       id: num,
       name: entry.name,
-      size: entry.size,
+      size: formatSize(entry.size),
       createTime: timestampToTime(entry.ctime),
       modifyTime: timestampToTime(entry.mtime),
       isSelect: false,
       numType: entry.type,
       type: entry.type === 8 ? entry.name.split('.').pop() : '' // 8是文件，其他是文件夹
     })
+  }
+  await sortFileList('asc')
+}
+const searchFile = () => {
+  if (searchValue.value === '') {
+    fileItemList.value = copyFileList.value
+  } else {
+    fileItemList.value = copyFileList.value.filter(item => item.name.includes(searchValue.value))
   }
 }
 // 将类似这种1533657660n的bigint转换为xxxx-xx-xx xx:xx:xx格式
@@ -510,7 +534,7 @@ const createNewFolder = () => {
     });
   });
 }
-const handleUploadFile = async (event, file, fileList) => {
+const handleUploadFile = async (event, file, fileList, isDrag) => {
   try {
     // 创建一个 FileReader 对象
     const reader = new FileReader();
@@ -531,7 +555,7 @@ const handleUploadFile = async (event, file, fileList) => {
         };
         
         // 开始读取文件内容
-        reader.readAsArrayBuffer(file[0].raw);
+        reader.readAsArrayBuffer(isDrag ? file[0] : file[0].raw);
       });
     };
     
@@ -688,9 +712,7 @@ const downloadFile = async (fileName) => {
       chunks.push(chunk);
     },
   });
-  
   await connect.pipeTo(writableStream);
-  
   // Combine all Uint8Arrays into one
   const combinedUint8Array = new Uint8Array(chunks.reduce((acc, chunk) => acc + chunk.byteLength, 0));
   let offset = 0;
@@ -698,10 +720,8 @@ const downloadFile = async (fileName) => {
     combinedUint8Array.set(chunk, offset);
     offset += chunk.byteLength;
   }
-  
   // Create Blob from Uint8Array
   const blob = new Blob([combinedUint8Array]);
-  
   // Create download link
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -714,15 +734,62 @@ const downloadFile = async (fileName) => {
   window.URL.revokeObjectURL(url);
   document.body.removeChild(a);
 }
+const rightDownloadFile = async (fileName, type) => {
+  if (type === 8) {
+    await downloadFile(fileName)
+  } else {
+    // 判断dirPathName.value头部是否有多余的'/'，如果有多余的'/'，只保留一个，如果没有则不变
+    dirPathName.value = dirPathName.value.replace(/^\/{2,}/, '/');
+    let filePath = dirPathName.value === '/' ? '/' + fileName : dirPathName.value + '/' + fileName
+    console.log('下载文件地址', filePath)
+    await executeCommand(`tar -cvf ${filePath}.tar ${filePath}`)
+    await downloadFile(fileName + '.tar')
+    await executeCommand(`rm ${filePath}.tar`)
+  }
+}
 const topDownloadFile = async () => {
   for (let i = 0; i < fileItemList.value.length; i++) {
     if (fileItemList.value[i].isSelect) {
-      await downloadFile(fileItemList.value[i].name)
+      await rightDownloadFile(fileItemList.value[i].name, fileItemList.value[i].numType)
     }
   }
 }
+// 排序
+const sortFileList = async (type) => {
+  if (type === 'asc') {
+    fileItemList.value.sort((a, b) => {
+      return a.name.localeCompare(b.name)
+    })
+    sortType.value = 'asc'
+  } else {
+    fileItemList.value.sort((a, b) => {
+      return b.name.localeCompare(a.name)
+    })
+    sortType.value = 'desc'
+  }
+  copyFileList.value = JSON.parse(JSON.stringify(fileItemList.value))
+}
 
-
+const handleDrop = (e) => {
+  isDragging.value = false;
+  e.preventDefault();
+  let files = e.dataTransfer.files;
+  console.log(files)
+  let fileList = []
+  handleUploadFile(e, files, fileList, true)
+}
+const handleDragOver = (e) => {
+  e.preventDefault();
+  console.log('进入')
+  isDragging.value = true;
+  return false; // 阻止默认行为
+}
+const handleDragLeave = (el) => {
+  console.log('离开')
+  if (!document.getElementById('showFileCard').contains(el.relatedTarget)) {
+    isDragging.value = false;
+  }
+}
 onMounted(() => {
   getFileList('')
 })
@@ -777,5 +844,25 @@ onUnmounted(() => {
   &:hover {
     background-color: #dedfe0;
   }
+}
+
+.drag-over {
+  border: 2px dashed #409EFF;
+}
+
+.overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: #e2ebf4;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 18px;
+  color: #333;
+  z-index: 999;
+  opacity: 0.6;
 }
 </style>
