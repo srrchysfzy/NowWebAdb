@@ -104,11 +104,12 @@
   </el-row>
 </template>
 <script setup>
-import {executeCommand, getAdbInstance} from "@/assets/js/adbManager.js";
-import useWindowResize from "@/assets/js/useWindowResize.js";
+import {executeCommand, getAdbInstance} from "@/utils/adbManager.js";
+import useWindowResize from "@/utils/useWindowResize.js";
 import SvgIcon from "@/components/SvgIcon.vue";
 import {Iphone} from "@element-plus/icons-vue";
 
+const router = useRouter();
 const {width, height} = useWindowResize();
 const adbObject = computed(() => {
   return getAdbInstance()
@@ -132,40 +133,53 @@ const deviceCpuCore = ref('')
 const deviceCpuBrand = ref('')
 
 const getDevice = async () => {
-  let adb = adbObject.value
-  deviceVersion.value = await adb.getProp("ro.build.version.release");
-  const screenshot = await adb.framebuffer();
-  const canvas = document.createElement("canvas");
-  // 将canvas的样式z-index设置为99999
-  canvas.style.zIndex = '99999';
-  canvas.width = screenshot.width;
-  canvas.height = screenshot.height;
-  
-  const context = canvas.getContext("2d");
-  const imageData = new ImageData(
-    new Uint8ClampedArray(screenshot.data),
-    screenshot.width,
-    screenshot.height,
-  );
-  context.putImageData(imageData, 0, 0);
-  deviceNowImg.value = canvas.toDataURL()
-  const batteryRes = await batteryVoltage();
-  deviceBatteryVoltage.value = batteryRes ? batteryRes.split(':')[1] : '--'
-  deviceWifi.value = await wifiInfo()
-  deviceIp.value = await getDeviceIp()
-  const storageRes = await deviceStore()
-  deviceStorageTotal.value = storageRes.total
-  deviceStorageUsed.value = storageRes.used
-  deviceStorageUsedRate.value = storageRes.usedRate
-  const memoryRes = await deviceMemory()
-  deviceMemoryTotal.value = memoryRes.total
-  deviceMemoryUsed.value = memoryRes.used.toFixed(2)
-  deviceMemoryUsedRate.value = memoryRes.usedRate
-  deviceScreenSize.value = await getDeviceScreenSize()
-  deviceSerialno.value = await getDeviceSerialno()
-  deviceAbi.value = await getDeviceAbi()
-  deviceCpuCore.value = await getDeviceCpuCore()
-  deviceCpuBrand.value = await getDeviceCpuBrand()
+  try {
+    let adb = adbObject.value
+    deviceVersion.value = await adb.getProp("ro.build.version.release");
+    const screenshot = await adb.framebuffer();
+    const canvas = document.createElement("canvas");
+    // 将canvas的样式z-index设置为99999
+    canvas.style.zIndex = '99999';
+    canvas.width = screenshot.width;
+    canvas.height = screenshot.height;
+
+    const context = canvas.getContext("2d");
+    const imageData = new ImageData(
+        new Uint8ClampedArray(screenshot.data),
+        screenshot.width,
+        screenshot.height,
+    );
+    context.putImageData(imageData, 0, 0);
+    deviceNowImg.value = canvas.toDataURL()
+    const batteryRes = await batteryVoltage();
+    deviceBatteryVoltage.value = batteryRes ? batteryRes.split(':')[1] : '--'
+    deviceWifi.value = await wifiInfo()
+    deviceIp.value = await getDeviceIp()
+    const storageRes = await deviceStore()
+    deviceStorageTotal.value = storageRes.total
+    deviceStorageUsed.value = storageRes.used
+    deviceStorageUsedRate.value = storageRes.usedRate
+    const memoryRes = await deviceMemory()
+    deviceMemoryTotal.value = memoryRes.total
+    deviceMemoryUsed.value = memoryRes.used.toFixed(2)
+    deviceMemoryUsedRate.value = memoryRes.usedRate
+    deviceScreenSize.value = await getDeviceScreenSize()
+    deviceSerialno.value = await getDeviceSerialno()
+    deviceAbi.value = await getDeviceAbi()
+    deviceCpuCore.value = await getDeviceCpuCore()
+    deviceCpuBrand.value = await getDeviceCpuBrand()
+  } catch (e) {
+    ElNotification.error({
+      title: '连接断开',
+      message: '连接已断开，请重新连接',
+      type: 'error',
+      duration: 3000
+    })
+    // 路由跳转
+    await router.push({
+      name: "Home",
+    });
+  }
 }
 const batteryVoltage = async () => {
   const res = await executeCommand('dumpsys battery | grep voltage');

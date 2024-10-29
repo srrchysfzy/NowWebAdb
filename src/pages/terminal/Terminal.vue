@@ -4,8 +4,8 @@
 <script setup>
 import { encodeUtf8 } from "@yume-chan/adb";
 import { Consumable } from "@yume-chan/stream-extra";
-import { getAdbInstance } from "@/assets/js/adbManager.js";
-import useWindowResize from "@/assets/js/useWindowResize.js";
+import { getAdbInstance } from "@/utils/adbManager.js";
+import useWindowResize from "@/utils/useWindowResize.js";
 import { debounce } from 'lodash'
 import { Terminal } from "xterm";
 import { FitAddon } from "xterm-addon-fit";

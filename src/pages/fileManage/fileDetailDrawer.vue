@@ -83,7 +83,7 @@
 </template>
 <script setup>
 import {CopyDocument, Warning} from "@element-plus/icons-vue";
-import {formatSize} from "@/assets/js/adbManager.js";
+import {formatSize} from "@/utils/adbManager.js";
 
 const drawerDisplay = ref(false);
 const nowFileInfo = ref({

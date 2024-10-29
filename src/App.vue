@@ -10,7 +10,7 @@
 </template>
 <script setup>
 import HeaderMenu from "@/layouts/headerMenu.vue";
-import useWindowResize from "@/assets/js/useWindowResize";
+import useWindowResize from "@/utils/useWindowResize.js";
 import router from "@/router/index.js";
 
 const {width, height} = useWindowResize();

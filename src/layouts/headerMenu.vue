@@ -23,7 +23,7 @@
     <el-menu-item index="terminal">
       <span class="fw-bold fs-6">终端操作</span>
     </el-menu-item>
-    <el-menu-item index="5">
+    <el-menu-item index="screenControl">
       <span class="fw-bold fs-6">屏幕操作</span>
     </el-menu-item>
     <div class="flex-grow"/>
@@ -40,15 +40,12 @@
   </el-menu>
 </template>
 <script setup>
-import useWindowResize from "@/assets/js/useWindowResize.js";
+import useWindowResize from "@/utils/useWindowResize.js";
 import SvgIcon from "@/components/SvgIcon.vue";
 import BatteryIcon from "@/components/BatteryIcon.vue";
 import TemperatureIcon from "@/components/TemperatureIcon.vue";
 import {Switch} from "@element-plus/icons-vue";
-// import {useDeviceStore} from "@/stores/device.js";
-import {getAdbInstance, executeCommand} from "@/assets/js/adbManager.js";
-import {DecodeUtf8Stream} from "@yume-chan/stream-extra";
-import {AdbSubprocessNoneProtocol} from "@yume-chan/adb";
+import {getAdbInstance, executeCommand} from "@/utils/adbManager.js";
 
 // const deviceStore = useDeviceStore();
 const {width, height} = useWindowResize();

@@ -229,8 +229,8 @@ import {
   Search, Top,
 } from "@element-plus/icons-vue";
 import SvgIcon from "@/components/SvgIcon.vue";
-import {getAdbInstance, executeCommand, formatSize} from "@/assets/js/adbManager.js";
-import useWindowResize from "@/assets/js/useWindowResize.js";
+import {getAdbInstance, executeCommand, formatSize} from "@/utils/adbManager.js";
+import useWindowResize from "@/utils/useWindowResize.js";
 import FileDetailDrawer from "@/pages/fileManage/fileDetailDrawer.vue";
 import {Consumable} from "@yume-chan/stream-extra";
 

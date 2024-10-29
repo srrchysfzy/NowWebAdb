@@ -1,9 +1,10 @@
 // src/router/index.js
-import HomeView from '@/pages/home/index.vue';
-import OverView from '@/pages/overview/index.vue';
+import HomeView from '@/pages/home/home.vue';
+import OverView from '@/pages/overview/overview.vue';
 import FileManage from "@/pages/fileManage/fileManage.vue";
 import AppManage from "@/pages/appManage/appManage.vue";
 import Terminal from '@/pages/terminal/Terminal.vue';
+import screenControl from '@/pages/scrcpyShow/scrcpy.vue';
 
 const routes = [
     {
@@ -30,6 +31,11 @@ const routes = [
         path: '/terminal',
         name: 'Terminal',
         component: Terminal,
+    },
+    {
+        path: '/screenControl',
+        name: 'screenControl',
+        component: screenControl,
     },
 
 ];

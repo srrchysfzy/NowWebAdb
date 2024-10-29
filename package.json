@@ -6,16 +6,19 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "postinstall": "fetch-scrcpy-server 2.5"
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.1",
-    "@yume-chan/adb": "^0.0.23",
-    "@yume-chan/adb-credential-web": "^0.0.23",
-    "@yume-chan/adb-daemon-webusb": "^0.0.23",
-    "@yume-chan/adb-scrcpy": "^0.0.23",
-    "@yume-chan/android-bin": "^0.0.23",
-    "@yume-chan/stream-extra": "^0.0.23",
+    "@yume-chan/adb": "^0.0.24",
+    "@yume-chan/adb-credential-web": "^0.0.24",
+    "@yume-chan/adb-daemon-webusb": "^0.0.24",
+    "@yume-chan/adb-scrcpy": "^0.0.24",
+    "@yume-chan/android-bin": "^0.0.24",
+    "@yume-chan/scrcpy": "^0.0.24",
+    "@yume-chan/scrcpy-decoder-webcodecs": "^0.0.24",
+    "@yume-chan/stream-extra": "^0.0.24",
     "bootstrap": "^5.3.3",
     "element-plus": "^2.6.2",
     "lodash": "^4.17.21",
@@ -28,10 +31,10 @@
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^5.0.4",
-    "@yume-chan/fetch-scrcpy-server": "^0.0.23",
+    "@yume-chan/fetch-scrcpy-server": "^0.0.24",
     "sass": "^1.72.0",
     "unplugin-auto-import": "^0.17.5",
     "unplugin-vue-components": "^0.26.0",
-    "vite": "^5.1.6"
+    "vite": "^5.4.8"
   }
 }

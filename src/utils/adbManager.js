@@ -1,6 +1,6 @@
 import {AdbSubprocessNoneProtocol} from "@yume-chan/adb";
 
-let adbInstance = null;
+let adbInstance
 
 export function setAdbInstance(instance) {
     adbInstance = instance;

@@ -10,7 +10,7 @@ import {
   LogcatFormat,
   PackageManager,
 } from "@yume-chan/android-bin";
-import {getAdbInstance} from "@/assets/js/adbManager.js";
+import {getAdbInstance} from "@/utils/adbManager.js";
 
 
 const initPmObj = async () => {
