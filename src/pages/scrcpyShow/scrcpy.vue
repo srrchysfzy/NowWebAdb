@@ -1,29 +1,29 @@
 <template>
   <el-card style="border-radius: 12px">
     <el-space>
-        <!-- 用于展示内容的容器 -->
-        <div ref="renderContainer"
-             :class="classes"
-             :style="containerStyle"
-             @pointerdown="handlePointerDown"
-             @pointermove="handlePointerMove"
-             @pointerup="handlePointerUp"
-             @pointercancel="handlePointerUp"
-             @pointerleave="handlePointerLeave"
-             @contextmenu="handleContextMenu"
-        />
+      <!-- 用于展示内容的容器 -->
+      <div ref="renderContainer"
+           :class="classes"
+           :style="containerStyle"
+           @pointerdown="handlePointerDown"
+           @pointermove="handlePointerMove"
+           @pointerup="handlePointerUp"
+           @pointercancel="handlePointerUp"
+           @pointerleave="handlePointerLeave"
+           @contextmenu="handleContextMenu"
+      />
     </el-space>
     <el-space style="float: right; margin-top: 3px">
       <el-tooltip effect="dark" content="开启键盘">
         <div style="margin-top: 4px">
           <el-button v-if="openInput" type="primary" circle @click="openKeyInput('cancel')">
             <el-icon :size="12" style="vertical-align: middle">
-              <EditPen />
+              <EditPen/>
             </el-icon>
           </el-button>
           <el-button v-else type="info" circle @click="openKeyInput('open')">
             <el-icon :size="12" style="vertical-align: middle">
-              <EditPen />
+              <EditPen/>
             </el-icon>
           </el-button>
         </div>
@@ -32,11 +32,11 @@
   </el-card>
 </template>
 <script setup>
-import { ref, computed } from 'vue';
+import {ref, computed} from 'vue';
 import {InspectStream, ReadableStream} from '@yume-chan/stream-extra';
-import { getAdbInstance } from '@/utils/adbManager.js';
-import { VERSION } from '@yume-chan/fetch-scrcpy-server';
-import { AdbScrcpyClient, AdbScrcpyOptionsLatest } from '@yume-chan/adb-scrcpy';
+import {getAdbInstance} from '@/utils/adbManager.js';
+import {VERSION} from '@yume-chan/fetch-scrcpy-server';
+import {AdbScrcpyClient, AdbScrcpyOptionsLatest} from '@yume-chan/adb-scrcpy';
 import {
   CodecOptions,
   ScrcpyVideoCodecId,
@@ -51,8 +51,8 @@ import {
   AndroidMotionEventButton,
   ScrcpyHoverHelper, AndroidKeyEventAction, AndroidKeyCode, AndroidKeyEventMeta,
 } from '@yume-chan/scrcpy';
-import { DEFAULT_SETTINGS } from '@/utils/scrcpySettings.js';
-import { WebCodecsVideoDecoder } from '@yume-chan/scrcpy-decoder-webcodecs';
+import {DEFAULT_SETTINGS} from '@/utils/scrcpySettings.js';
+import {WebCodecsVideoDecoder} from '@yume-chan/scrcpy-decoder-webcodecs';
 import {clamp} from "lodash";
 import {EditPen} from "@element-plus/icons-vue";
 import useWindowResize from "@/utils/useWindowResize.js";
@@ -66,10 +66,11 @@ let hoverHelper
 let videoStream
 let aspectRatio
 let decoder = null;
-const { height: windowHeight } = useWindowResize();
+const {height: windowHeight} = useWindowResize();
 const renderContainer = ref();
 const openInput = ref(false)
 const adbInstance = computed(() => getAdbInstance());
+const lastKeyframe = ref(0n);
 // 旋转角度常量
 const ROTATION_90 = 1;
 const ROTATION_180 = 2;
@@ -116,143 +117,6 @@ const handleKeyEvent = async (e) => {
   } else {
     console.log('移除键盘监听事件', e);
   }
-};
-
-// 初始化视频解码器
-const initializeDecoder = async (videoPacketStream, metadata) => {
-  try {
-    decoder = new WebCodecsVideoDecoder(ScrcpyVideoCodecId.H264, true);
-
-    if (renderContainer.value) {
-      renderContainer.value.appendChild(decoder.renderer);
-      console.log('添加渲染器到容器decoder.renderer', decoder.renderer);
-    } else {
-      console.error('渲染容器未找到');
-      return;
-    }
-
-    const lastKeyframe = ref(0n);
-    const handler = new InspectStream((packet) => {
-      handlePacket(packet, lastKeyframe, metadata);
-    });
-
-    await handleWheelTest();
-
-    if (videoPacketStream && typeof videoPacketStream.pipeTo === 'function') {
-      videoPacketStream.pipeThrough(handler).pipeTo(decoder.writable);
-    } else {
-      console.error('videoPacketStream 无效或不可用');
-    }
-  } catch (error) {
-    console.error('初始化解码器时出错:', error);
-  }
-};
-
-// 处理传入的视频数据包
-const handlePacket = (packet, lastKeyframe, metadata) => {
-  if (packet.type === "configuration") {
-    handleConfiguration(packet.data, metadata);
-  } else if (packet.keyframe && packet.pts !== undefined) {
-    handleKeyframe(packet, lastKeyframe);
-  }
-};
-
-// 处理视频配置变化
-const handleConfiguration = (data, metadata) => {
-  let croppedWidth, croppedHeight;
-
-  switch (metadata.codec) {
-    case ScrcpyVideoCodecId.H264:
-      ({ croppedWidth, croppedHeight } = h264ParseConfiguration(data));
-      break;
-    case ScrcpyVideoCodecId.H265:
-      ({ croppedWidth, croppedHeight } = h265ParseConfiguration(data));
-      break;
-    default:
-      throw new Error("Codec not supported");
-  }
-  console.log(`[client] 视频尺寸变化: ${croppedWidth}x${croppedHeight}`);
-  width.value = croppedWidth;
-  height.value = croppedHeight;
-  changeStyle(metadata);
-};
-
-// 处理关键帧数据包
-const handleKeyframe = (packet, lastKeyframe) => {
-  if (lastKeyframe.value) {
-    const interval = (Number(packet.pts - lastKeyframe.value) / 1000) | 0;
-    console.log(`[client] 关键帧间隔: ${interval}ms`);
-    rotateScreen(rotation);
-  }
-  lastKeyframe.value = packet.pts;
-};
-
-// 更改样式，基于宽高计算和旋转调整
-const changeStyle = () => {
-  // 计算并交换后的宽度和高度
-  const [calcWidth, calcHeight] = swapWidthHeight(width.value, height.value);
-  console.log('计算后的宽高:', calcWidth, calcHeight);
-
-  // 设置渲染器的样式宽高
-  setRendererStyle(decoder.renderer, calcWidth, calcHeight);
-
-  // 更新容器的样式
-  updateContainerStyle(calcWidth, calcHeight);
-};
-
-/**
- * 设置渲染器的样式宽高
- * @param {HTMLElement} renderer 渲染器元素
- * @param {number} calcWidth 宽度
- * @param {number} calcHeight 高度
- */
-const setRendererStyle = (renderer, calcWidth, calcHeight) => {
-  renderer.style.width = `${calcWidth}px`;
-  renderer.style.height = `${calcHeight}px`;
-};
-
-/**
- * 更新容器的样式
- * @param {number} calcWidth 宽度
- * @param {number} calcHeight 高度
- */
-const updateContainerStyle = (calcWidth, calcHeight) => {
-  containerStyle.value = {
-    width: `${calcWidth}px`,
-    height: `${calcHeight}px`,
-    borderRadius: "20px",
-    overflow: "hidden",
-    transform: `translate(${(rotatedWidth.value - width.value) / 2}px, ${(rotatedHeight.value - height.value) / 2}px) rotate(${rotation * 90}deg)`,
-  };
-};
-
-
-/**
- * 根据传入的宽高，如果宽度大于高度则交换宽高
- * @param {number} widthVal 当前宽度
- * @param {number} heightVal 当前高度
- * @returns {Array} 返回计算后的宽度和高度 [宽度, 高度]
- */
-const swapWidthHeight = (widthVal, heightVal) => {
-  const width = calculateWidth();
-  const height = windowHeight.value - 145; // 设置固定的高度基准
-
-  // 如果宽度大于高度，交换它们
-  return widthVal > heightVal ? [height, width] : [width, height];
-};
-
-/**
- * 根据当前高度等比计算宽度
- * @returns {number} 返回计算出的宽度
- */
-const calculateWidth = () => {
-  // 如果当前高度大于宽度，则计算宽高比
-  if (height.value > width.value) {
-    aspectRatio = width.value / height.value;
-  }
-
-  // 按高度和宽高比计算等比宽度
-  return Number(((windowHeight.value - 145) * aspectRatio).toFixed(0));
 };
 
 /**
@@ -325,10 +189,16 @@ const startScrcpyClient = async (adb) => {
 
     // 启动 scrcpy 客户端
     client = await AdbScrcpyClient.start(adb, DEFAULT_SERVER_PATH, VERSION, options);
+    client.stdout.pipeTo(new WritableStream({
+      write: (line) => {
+        console.log('stdout:', line);
+      },
+    })).then(r =>  console.log('pipeTo', r));
+
     videoStream = await client.videoStream;
 
     if (videoStream) {
-      await initializeVideoStream(videoStream);
+      initializeVideoStream(videoStream);
       console.log('视频流已启动');
     }
   } catch (error) {
@@ -340,8 +210,8 @@ const startScrcpyClient = async (adb) => {
  * 初始化视频流并设置宽高
  * @param {Object} videoStream 视频流对象
  */
-const initializeVideoStream = async (videoStream) => {
-  const { metadata, stream: videoPacketStream } = videoStream;
+const initializeVideoStream = (videoStream) => {
+  const {metadata, stream: videoPacketStream} = videoStream;
   console.log('视频元数据:', metadata);
   console.log('视频元数据的 codec:', metadata.codec);
 
@@ -350,7 +220,168 @@ const initializeVideoStream = async (videoStream) => {
   height.value = metadata.height;
 
   // 初始化解码器
-  await initializeDecoder(videoPacketStream, metadata);
+  initializeDecoder(videoPacketStream, metadata);
+};
+
+
+/**
+ * 初始化视频解码器，连接视频流并将渲染器附加到容器。
+ * @param {ReadableStream} videoPacketStream - 视频数据包流。
+ * @param {Object} metadata - 包含视频宽高和编码信息的元数据。
+ */
+const initializeDecoder = (videoPacketStream, metadata) => {
+  try {
+    // 设置解码器
+    decoder = new WebCodecsVideoDecoder(ScrcpyVideoCodecId.H264, true);
+
+    // 检查并附加渲染器
+    if (!renderContainer.value) {
+      console.error('渲染容器未找到');
+      return;
+    }
+    renderContainer.value.appendChild(decoder.renderer);
+    console.log('添加渲染器到容器:', decoder.renderer);
+
+    // 重置关键帧跟踪
+    lastKeyframe.value = 0n;
+
+    // 处理视频包
+    const handler = new InspectStream((packet) => handlePacket(packet, metadata));
+
+    // 绑定滚轮事件
+    handleWheelTest();
+
+    // 连接视频流
+    if (videoPacketStream && typeof videoPacketStream.pipeTo === 'function') {
+      videoPacketStream.pipeThrough(handler).pipeTo(decoder.writable);
+      console.log('视频流已连接到解码器');
+    } else {
+      console.error('videoPacketStream 无效或不可用');
+    }
+  } catch (error) {
+    console.error('初始化解码器时出错:', error);
+  }
+};
+
+
+/**
+ * 处理传入的视频数据包，区分配置包和关键帧。
+ * @param {Object} packet - 视频数据包，包含类型和时间戳等信息。
+ * @param {Object} metadata - 视频的元数据，用于获取编码信息。
+ */
+const handlePacket = (packet, metadata) => {
+  if (packet.type === "configuration") {
+    handleConfiguration(packet.data, metadata);
+  } else if (packet.keyframe && packet.pts !== undefined) {
+    handleKeyframe(packet);
+  }
+};
+
+/**
+ * 处理视频配置变化，解析视频宽高并更新样式。
+ * @param {Uint8Array} data - 视频配置数据。
+ * @param {Object} metadata - 视频的元数据，包含编码信息。
+ */
+const handleConfiguration = (data, metadata) => {
+  let croppedWidth, croppedHeight;
+  // 根据编码类型解析宽高
+  switch (metadata.codec) {
+    case ScrcpyVideoCodecId.H264:
+      ({ croppedWidth, croppedHeight } = h264ParseConfiguration(data));
+      break;
+    case ScrcpyVideoCodecId.H265:
+      ({ croppedWidth, croppedHeight } = h265ParseConfiguration(data));
+      break;
+    default:
+      throw new Error("Unsupported codec");
+  }
+  console.log(`[client] 视频尺寸变化: ${croppedWidth}x${croppedHeight}`);
+
+  // 更新宽高并调整样式
+  width.value = croppedWidth;
+  height.value = croppedHeight;
+  changeStyle();
+};
+
+/**
+ * 处理关键帧数据包，记录关键帧间隔时间。
+ * @param {Object} packet - 包含关键帧数据和时间戳。
+ */
+const handleKeyframe = (packet) => {
+  if (lastKeyframe.value) {
+    const interval = Math.floor(Number(packet.pts - lastKeyframe.value) / 1000);
+    console.log(`[client] 关键帧间隔: ${interval}ms`);
+  }
+  lastKeyframe.value = packet.pts;
+};
+
+/**
+ * 根据宽高和旋转调整容器和渲染器样式。
+ */
+const changeStyle = () => {
+  const [calcWidth, calcHeight] = swapWidthHeight(width.value, height.value);
+  console.log('计算后的宽高:', calcWidth, calcHeight);
+
+  // 更新渲染器样式
+  setRendererStyle(decoder.renderer, calcWidth, calcHeight);
+
+  // 更新容器样式
+  updateContainerStyle(calcWidth, calcHeight);
+};
+
+/**
+ * 设置渲染器的样式宽高
+ * @param {HTMLElement} renderer 渲染器元素
+ * @param {number} calcWidth 宽度
+ * @param {number} calcHeight 高度
+ */
+const setRendererStyle = (renderer, calcWidth, calcHeight) => {
+  renderer.style.width = `${calcWidth}px`;
+  renderer.style.height = `${calcHeight}px`;
+};
+
+/**
+ * 更新容器的样式
+ * @param {number} calcWidth 宽度
+ * @param {number} calcHeight 高度
+ */
+const updateContainerStyle = (calcWidth, calcHeight) => {
+  containerStyle.value = {
+    width: `${calcWidth}px`,
+    height: `${calcHeight}px`,
+    borderRadius: "20px",
+    overflow: "hidden",
+    transform: `translate(${(rotatedWidth.value - width.value) / 2}px, ${(rotatedHeight.value - height.value) / 2}px) rotate(${rotation * 90}deg)`,
+  };
+};
+
+
+/**
+ * 根据传入的宽高，如果宽度大于高度则交换宽高
+ * @param {number} widthVal 当前宽度
+ * @param {number} heightVal 当前高度
+ * @returns {Array} 返回计算后的宽度和高度 [宽度, 高度]
+ */
+const swapWidthHeight = (widthVal, heightVal) => {
+  const width = calculateWidth();
+  const height = windowHeight.value - 145; // 设置固定的高度基准
+
+  // 如果宽度大于高度，交换它们
+  return widthVal > heightVal ? [height, width] : [width, height];
+};
+
+/**
+ * 根据当前高度等比计算宽度
+ * @returns {number} 返回计算出的宽度
+ */
+const calculateWidth = () => {
+  // 如果当前高度大于宽度，则计算宽高比
+  if (height.value > width.value) {
+    aspectRatio = width.value / height.value;
+  }
+
+  // 按高度和宽高比计算等比宽度
+  return Number(((windowHeight.value - 145) * aspectRatio).toFixed(0));
 };
 
 
@@ -362,7 +393,7 @@ const initializeVideoStream = async (videoStream) => {
  */
 const clientPositionToDevicePosition = (clientX, clientY) => {
   if (!renderContainer.value) {
-    return { x: 0, y: 0 }; // 如果渲染容器不存在，返回默认坐标
+    return {x: 0, y: 0}; // 如果渲染容器不存在，返回默认坐标
   }
 
   const viewRect = renderContainer.value.getBoundingClientRect();
@@ -405,12 +436,12 @@ const adjustPositionForRotation = (pointerViewX, pointerViewY, rotation) => {
       break;
   }
 
-  return { x: adjustedX, y: adjustedY };
+  return {x: adjustedX, y: adjustedY};
 };
 
 // 事件处理器注册
 const handleWheelTest = async () => {
-  renderContainer.value.addEventListener("wheel", handleWheel, { passive: false });
+  renderContainer.value.addEventListener("wheel", handleWheel, {passive: false});
 };
 
 /**
@@ -429,7 +460,7 @@ const preventEventDefaults = (event) => {
 const handleWheel = async (event) => {
   preventEventDefaults(event); // 预防默认事件行为
 
-  const { x, y } = clientPositionToDevicePosition(event.clientX, event.clientY);
+  const {x, y} = clientPositionToDevicePosition(event.clientX, event.clientY);
   await client.controller.injectScroll({
     pointerX: x,
     pointerY: y,
@@ -451,7 +482,7 @@ const injectTouch = async (action, event) => {
       ? ScrcpyPointerId.Finger // Android 13 has bug with mouse injection
       : BigInt(event.pointerId);
 
-  const { x, y } = clientPositionToDevicePosition(event.clientX, event.clientY);
+  const {x, y} = clientPositionToDevicePosition(event.clientX, event.clientY);
 
   const messages = hoverHelper.process({
     action,
@@ -533,22 +564,6 @@ const handleKeyCode = async (e) => {
   }
 };
 
-/**
- * 旋转屏幕并重启解码器
- * @param {number} newRotation 新的旋转角度
- */
-const rotateScreen = async (newRotation) => {
-  rotation = newRotation;
-
-  // 停止解码器并清理
-  if (decoder) {
-    client.close();
-    renderContainer.value.removeChild(decoder.renderer); // 确保移除 Canvas
-    decoder = null;
-    console.log('解码器已关闭');
-  }
-  await scrcpyTest();
-};
 onMounted(() => {
   scrcpyTest();
 })
