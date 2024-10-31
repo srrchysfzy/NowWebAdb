@@ -1,15 +1,15 @@
-import { defineStore } from "pinia";
+import { defineStore } from 'pinia';
 
 export const useDeviceStore = defineStore('device', {
     state: () => ({
         adbObject: {},
-        deviceInfo: {}
+        deviceInfo: {},
     }),
     actions: {
-        setAdb(adb) {
+        updateAdb(adb) {
             this.adbObject = adb;
         },
-        setDeviceInfo(deviceInfo) {
+        updateDeviceInfo(deviceInfo) {
             this.deviceInfo = deviceInfo;
         },
         reset() {
@@ -18,11 +18,11 @@ export const useDeviceStore = defineStore('device', {
         }
     },
     getters: {
-        getAdb() {
-            return this.adbObject;
+        getDeviceInfo(state) {
+            return state.deviceInfo
         },
-        getDeviceInfo() {
-            return this.deviceInfo;
-        }
+        getAdbObject(state){
+            return state.adbObject
+        },
     }
 });

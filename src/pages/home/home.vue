@@ -63,14 +63,10 @@ import SvgIcon from '@/components/SvgIcon.vue';
 import {AdbDaemonWebUsbDeviceManager} from "@yume-chan/adb-daemon-webusb";
 import AdbWebCredentialStore from "@yume-chan/adb-credential-web";
 import {AdbDaemonTransport, Adb} from "@yume-chan/adb";
-// import {Consumable, DecodeUtf8Stream, ReadableStream} from "@yume-chan/stream-extra";
-// import { BIN, VERSION } from "@yume-chan/fetch-scrcpy-server";
-import {AdbScrcpyClient} from "@yume-chan/adb-scrcpy";
-import {useDeviceStore} from "@/stores/device.js";
 import {setAdbInstance} from "@/utils/adbManager.js";
 
 const router = useRouter();
-// const deviceStore = useDeviceStore();
+
 const connectStatus = ref('disconnected');
 const devicesName = ref('')
 let timerId;  // 定时器标识
@@ -98,53 +94,6 @@ const connectDevice = async () => {
       const adb = new Adb(transport);
       console.log(adb)
       setAdbInstance(adb)
-      // console.log(adb)
-      // console.log(adb.banner)
-      // deviceStore.setAdb(adb);
-      // let myDeviceInfo = {
-      //   device: '',
-      //   model: '',
-      //   product: '',
-      // }
-      // myDeviceInfo.device = adb.banner.device;
-      // myDeviceInfo.model = adb.banner.model;
-      // myDeviceInfo.product = adb.banner.product;
-      // deviceStore.setDeviceInfo(myDeviceInfo)
-
-      // const process = await adb.subprocess.spawn("ls -l");
-      // await process.stdout.pipeThrough(new DecodeUtf8Stream()).pipeTo(
-      //   new WritableStream({
-      //     write(chunk) {
-      //       console.log(chunk);
-      //     },
-      //   }),
-      // );
-
-
-      // console.log(VERSION); // 2.1
-      // const server = await fetch(BIN).then((res) => res.arrayBuffer());
-      // console.log(server)
-      //
-      // await AdbScrcpyClient.pushServer(
-      //   adb,
-      //   new ReadableStream({
-      //     start(controller) {
-      //       controller.enqueue(new Consumable(new Uint8Array(server)));
-      //       controller.close();
-      //     },
-      //   }),
-      // );
-
-      // const process = await adb.subprocess.spawn(
-      //   "CLASSPATH=/data/local/tmp/scrcpy-server.jar app_process / com.genymobile.scrcpy.Server 2.1",
-      // );
-      // await process.stdout.pipeThrough(new DecodeUtf8Stream()).pipeTo(
-      //   new WritableStream({
-      //     write(chunk) {
-      //       console.log('11111111', chunk);
-      //     },
-      //   }),
-      // );
       // 路由跳转
       await router.push({
         name: "Overview",

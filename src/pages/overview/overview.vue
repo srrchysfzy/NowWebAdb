@@ -155,7 +155,7 @@ const getDevice = async () => {
     deviceBatteryVoltage.value = batteryRes ? batteryRes.split(':')[1] : '--'
     deviceWifi.value = await wifiInfo()
     deviceIp.value = await getDeviceIp()
-    const storageRes = await deviceStore()
+    const storageRes = await deviceDiskSpace()
     deviceStorageTotal.value = storageRes.total
     deviceStorageUsed.value = storageRes.used
     deviceStorageUsedRate.value = storageRes.usedRate
@@ -169,6 +169,7 @@ const getDevice = async () => {
     deviceCpuCore.value = await getDeviceCpuCore()
     deviceCpuBrand.value = await getDeviceCpuBrand()
   } catch (e) {
+    console.log(e)
     ElNotification.error({
       title: '连接断开',
       message: '连接已断开，请重新连接',
@@ -191,7 +192,7 @@ const batteryVoltage = async () => {
     return '';
   }
 };
-const deviceStore = async () => {
+const deviceDiskSpace = async () => {
   const res = await executeCommand('df -h | grep \'/data\'');
   if (res) {
     const storageRegex = /(\d+G) +(\d+G) +\d+G +(\d+%)/;
