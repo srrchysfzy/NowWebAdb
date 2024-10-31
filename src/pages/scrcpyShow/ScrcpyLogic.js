@@ -80,11 +80,15 @@ const useScrcpy = () => {
     };
 
     // 处理键盘事件
-    const handleKeyEvent = async (e) => {
-        if (openInput.value) {
-            await handleKeyCode(e);
+    const handleKeyEvent = async (e, code=null) => {
+        if (code){
+            await handleKeyCode(e, code);
         } else {
-            console.log('移除键盘监听事件', e);
+            if (openInput.value) {
+                await handleKeyCode(e);
+            } else {
+                console.log('移除键盘监听事件', e);
+            }
         }
     };
 
@@ -521,16 +525,26 @@ const useScrcpy = () => {
     /**
      * 处理键盘事件
      * @param {KeyboardEvent} e 键盘事件
+     * @param code 屏幕物理按键专用
      */
-    const handleKeyCode = async (e) => {
-        const keyCode = AndroidKeyCode[e.code];
-        if (keyCode) {
+    const handleKeyCode = async (e, code=null) => {
+        if (code) {
             await client.controller.injectKeyCode({
-                action: e.type === 'keydown' ? AndroidKeyEventAction.Down : AndroidKeyEventAction.Up,
-                keyCode,
+                action: e.type === 'mousedown' ? AndroidKeyEventAction.Down : AndroidKeyEventAction.Up,
+                keyCode: code,
                 repeat: 0,
                 metaState: AndroidKeyEventMeta.NumLockOn,
             });
+        } else {
+            const keyCode = AndroidKeyCode[e.code];
+            if (keyCode) {
+                await client.controller.injectKeyCode({
+                    action: e.type === 'keydown' ? AndroidKeyEventAction.Down : AndroidKeyEventAction.Up,
+                    keyCode,
+                    repeat: 0,
+                    metaState: AndroidKeyEventMeta.NumLockOn,
+                });
+            }
         }
     };
 
@@ -573,6 +587,7 @@ const useScrcpy = () => {
         renderContainer,
         containerStyle,
         classes,
+        swapWidthHeight,
         openKeyInput,
         handleKeyEvent,
         handlePointerDown,
