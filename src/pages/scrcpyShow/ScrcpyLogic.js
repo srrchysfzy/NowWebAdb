@@ -29,13 +29,13 @@ const useScrcpy = () => {
     let options
     let client
     let rotation = 0
-    let width = ref(0)
-    let height = ref(0)
     let hoverHelper
     let videoStream
     let aspectRatio
     let decoder = null;
-    const {height: windowHeight} = useWindowResize();
+    const width = ref(0)
+    const height = ref(0)
+    const {height: windowHeight, width: windowWidth} = useWindowResize();
     const renderContainer = ref();
     const openInput = ref(false)
     const adbInstance = computed(() => getAdbInstance());
@@ -95,7 +95,7 @@ const useScrcpy = () => {
     /**
      * 初始化 scrcpy 测试，推送服务端并启动 scrcpy 客户端
      */
-    const scrcpyTest = async (renderRef) => {
+    const scrcpyStart = async (renderRef) => {
         try {
             console.log('Scrcpy 版本:', VERSION);
             console.log('renderRef', renderRef.renderContainer)
@@ -227,7 +227,7 @@ const useScrcpy = () => {
 
             // 连接视频流
             if (videoPacketStream && typeof videoPacketStream.pipeTo === 'function') {
-                videoPacketStream.pipeThrough(handler).pipeTo(decoder.writable);
+                videoPacketStream.pipeThrough(handler).pipeTo(decoder.writable).then(r =>  console.log('pipeTo', r));
                 console.log('视频流已连接到解码器');
             } else {
                 console.error('videoPacketStream 无效或不可用');
@@ -582,11 +582,14 @@ const useScrcpy = () => {
         client,
         width,
         height,
+        windowWidth,
+        windowHeight,
         rotation,
         openInput,
         renderContainer,
         containerStyle,
         classes,
+        changeStyle,
         swapWidthHeight,
         openKeyInput,
         handleKeyEvent,
@@ -595,7 +598,7 @@ const useScrcpy = () => {
         handlePointerUp,
         handlePointerLeave,
         handleContextMenu,
-        scrcpyTest,
+        scrcpyStart,
         destroyClient,
     };
 };
