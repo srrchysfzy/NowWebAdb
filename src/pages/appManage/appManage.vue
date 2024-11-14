@@ -164,6 +164,7 @@ import {getAdbInstance} from "@/utils/adbManager.js";
 import SvgIcon from "@/components/SvgIcon.vue";
 import useWindowResize from "@/utils/useWindowResize.js";
 import androidPack from '@/assets/img/androidPack.png';
+import {pushServerAndStartScrcpyClient} from "@/utils/adbUtils.js";
 
 const {width, height} = useWindowResize()
 const searchPackage = ref("");
@@ -196,7 +197,7 @@ const testReadAppInfo = async () => {
   await process.stdout.pipeThrough(new TextDecoderStream()).pipeTo(
       new WritableStream({
         write(chunk) {
-          if (chunk.includes("/data/local/tmp/classes.dex")) {
+          if (chunk.includes("com.lyx.myapplication.Main")) {
             isServiceRunning = true
             console.log("服务已开启，无需额外启动")
           }
@@ -205,15 +206,17 @@ const testReadAppInfo = async () => {
   );
   if (!isServiceRunning) {
     console.log("服务未开启，尝试开启服务")
+    console.log("准备推送apkans.jar")
+    await pushServerAndStartScrcpyClient(adb,'/apkans.jar', false)
     await adb.subprocess.spawn(
-        "cd /data/local/tmp & nohup app_process -Djava.class.path=/data/local/tmp/classes.dex /system/bin com.lyx.myapplication.Main > /dev/null 2>&1 &"
+        "CLASSPATH=/data/local/tmp/apkans.jar nohup app_process / com.lyx.myapplication.Main > /dev/null 2>&1 &"
     );
     // 检测服务是否开启
     const process = await adb.subprocess.spawn("top -b -n 1 | grep app_process");
     await process.stdout.pipeThrough(new TextDecoderStream()).pipeTo(
         new WritableStream({
           write(chunk) {
-            if (chunk.includes("/data/local/tmp/classes.dex")) {
+            if (chunk.includes("com.lyx.myapplication.Main")) {
               console.log("当前服务已开启")
             }
           },
@@ -225,36 +228,54 @@ const testReadAppInfo = async () => {
 // 客户端开启socket连接
 const testSocket = async () => {
   console.log("开启socket连接");
-  let adb = await getAdbInstance();
-  // 创建与 Android 设备端口的套接字连接
-  socket = await adb.createSocket("tcp:4521");
-  console.log("socket连接成功");
-  const decoder = new TextDecoder("utf-8");
+  const maxRetries = 5; // 最大重试次数
+  const retryInterval = 1000; // 重试间隔时间（毫秒）
 
-  let currentAppInfo = '';
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      let adb = await getAdbInstance();
+      // 创建与 Android 设备端口的套接字连接
+      socket = await adb.createSocket("tcp:4521");
+      console.log("socket连接成功");
+      const decoder = new TextDecoder("utf-8");
 
-  await socket.readable.pipeTo(
-      new WritableStream({
-        write(chunk) {
-          const decodedChunk = decoder.decode(chunk);
-          if (decodedChunk.startsWith("appName: ")) {
+      let currentAppInfo = '';
+
+      await socket.readable.pipeTo(
+        new WritableStream({
+          write(chunk) {
+            const decodedChunk = decoder.decode(chunk);
+            if (decodedChunk.startsWith("appName: ")) {
+              if (currentAppInfo) {
+                appInfoList.value.push(currentAppInfo);
+                currentAppInfo = '';
+              }
+              currentAppInfo = decodedChunk;
+            } else {
+              currentAppInfo += decodedChunk;
+            }
+          },
+          close() {
             if (currentAppInfo) {
               appInfoList.value.push(currentAppInfo);
-              currentAppInfo = '';
             }
-            currentAppInfo = decodedChunk;
-          } else {
-            currentAppInfo += decodedChunk;
           }
-        },
-        close() {
-          if (currentAppInfo) {
-            appInfoList.value.push(currentAppInfo);
-          }
-        }
-      })
-  );
+        })
+      );
+      return; // 成功连接后退出循环
+    } catch (error) {
+      console.error(`尝试 ${attempt} 次创建socket失败:`, error);
+      if (attempt < maxRetries) {
+        console.log(`将在 ${retryInterval / 1000} 秒后重试...`);
+        await new Promise(resolve => setTimeout(resolve, retryInterval));
+      } else {
+        console.error("达到最大重试次数，放弃连接");
+        throw error; // 达到最大重试次数后抛出异常
+      }
+    }
+  }
 }
+
 
 const testAppInfoList = async () => {
   appInfoList.value.forEach((item, index) => {

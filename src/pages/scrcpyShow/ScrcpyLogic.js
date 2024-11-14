@@ -24,6 +24,7 @@ import { DEFAULT_SETTINGS } from '@/utils/scrcpySettings.js';
 import { WebCodecsVideoDecoder } from '@yume-chan/scrcpy-decoder-webcodecs';
 import { clamp } from "lodash";
 import useWindowResize from "@/utils/useWindowResize.js";
+import {pushServerAndStartScrcpyClient} from "@/utils/adbUtils.js";
 
 const useScrcpy = () => {
     let options
@@ -100,44 +101,14 @@ const useScrcpy = () => {
             console.log('Scrcpy 版本:', VERSION);
             console.log('renderRef', renderRef.renderContainer)
             renderContainer.value = renderRef.renderContainer;
-            const serverBuffer = await fetchServerBinary('/server.bin');
             const adb = await adbInstance.value;
-
-            await pushServerToAdb(adb, serverBuffer);
+            await pushServerAndStartScrcpyClient(adb,'/server.bin')
             console.log('服务端已推送');
 
             await startScrcpyClient(adb);
         } catch (error) {
             console.error('初始化 scrcpy 时出错:', error);
         }
-    };
-
-    /**
-     * 获取服务端二进制文件
-     * @param {string} path 服务端文件路径
-     * @returns {Promise<ArrayBuffer>} 返回服务端二进制文件的 ArrayBuffer
-     */
-    const fetchServerBinary = async (path) => {
-        const serverUrl = new URL(path, import.meta.url);
-        const response = await fetch(serverUrl);
-        return await response.arrayBuffer();
-    };
-
-    /**
-     * 将服务端文件推送到 ADB
-     * @param adb ADB 实例
-     * @param {ArrayBuffer} serverBuffer 服务端二进制文件的 ArrayBuffer
-     */
-    const pushServerToAdb = async (adb, serverBuffer) => {
-        await AdbScrcpyClient.pushServer(
-            adb,
-            new ReadableStream({
-                start(controller) {
-                    controller.enqueue(new Uint8Array(serverBuffer));
-                    controller.close();
-                },
-            })
-        );
     };
 
     /**
