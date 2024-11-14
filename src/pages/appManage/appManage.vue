@@ -91,7 +91,7 @@
                 </div>
                 <el-image v-if="appItem.IconBase64 === 'data:image/png;base64,' || appItem.IconBase64 === ''" :src="androidPack" :style="{width: 40 + 'px', height: 40 + 'px', borderRadius: 12 +'px'}" fit="fill"/>
                 <el-image v-else :src="appItem.IconBase64" :style="{width: 40 + 'px', height: 40 + 'px', borderRadius: 12 +'px'}" fit="fill"/>
-<!--                <el-avatar shape="square" :size="40" :src="appItem.IconBase64" />-->
+                <!--                <el-avatar shape="square" :size="40" :src="appItem.IconBase64" />-->
                 <span class="fileNameCss">{{ appItem.appName }}</span>
               </el-space>
             </el-col>
@@ -152,12 +152,7 @@
 </template>
 
 <script setup>
-import {
-  AndroidLogPriority,
-  Logcat,
-  LogcatFormat,
-  PackageManager,
-} from "@yume-chan/android-bin";
+import {PackageManager} from "@yume-chan/android-bin";
 import {TextDecoderStream, WritableStream} from "@yume-chan/stream-extra";
 import {Bottom, CircleCheck, CircleCheckFilled, More, RemoveFilled, Search, Top} from '@element-plus/icons-vue'
 import {getAdbInstance} from "@/utils/adbManager.js";
@@ -242,25 +237,25 @@ const testSocket = async () => {
       let currentAppInfo = '';
 
       await socket.readable.pipeTo(
-        new WritableStream({
-          write(chunk) {
-            const decodedChunk = decoder.decode(chunk);
-            if (decodedChunk.startsWith("appName: ")) {
+          new WritableStream({
+            write(chunk) {
+              const decodedChunk = decoder.decode(chunk);
+              if (decodedChunk.startsWith("appName: ")) {
+                if (currentAppInfo) {
+                  appInfoList.value.push(currentAppInfo);
+                  currentAppInfo = '';
+                }
+                currentAppInfo = decodedChunk;
+              } else {
+                currentAppInfo += decodedChunk;
+              }
+            },
+            close() {
               if (currentAppInfo) {
                 appInfoList.value.push(currentAppInfo);
-                currentAppInfo = '';
               }
-              currentAppInfo = decodedChunk;
-            } else {
-              currentAppInfo += decodedChunk;
             }
-          },
-          close() {
-            if (currentAppInfo) {
-              appInfoList.value.push(currentAppInfo);
-            }
-          }
-        })
+          })
       );
       return; // 成功连接后退出循环
     } catch (error) {
@@ -313,6 +308,7 @@ const testAppInfoList = async () => {
   })
 
   console.log(appItemList.value);
+  socket.close();
 }
 
 const sendPackage = async (path) => {
@@ -323,14 +319,6 @@ const sendPackage = async (path) => {
   console.log("数据发送成功");
   writer.releaseLock();
 }
-// const testSendPackage = async () => {
-//   writer = socket.writable.getWriter();
-//   console.log("测试发送消息");
-//   await writer.write(new TextEncoder().encode(searchPackage.value));
-//   await writer.write(new TextEncoder().encode("\r"));
-//   console.log("数据发送成功");
-//   writer.releaseLock();
-// }
 const getCurrentAppItem = (name) => {
   console.log(name)
 }

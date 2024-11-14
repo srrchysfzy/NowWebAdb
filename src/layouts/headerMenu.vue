@@ -1,11 +1,11 @@
 <template>
   <el-menu
-    :default-active="activeIndex"
-    mode="horizontal"
-    class="menuCss"
-    :ellipsis="false"
-    @select="handleSelect"
-    router
+      :default-active="activeIndex"
+      mode="horizontal"
+      class="menuCss"
+      :ellipsis="false"
+      @select="handleSelect"
+      router
   >
     <SvgIcon icon="HomeIcon" style="margin-top: 15px" :style="{width:35 + 'px', height:35 + 'px'}"></SvgIcon>
     <el-menu-item index="overview">
@@ -17,7 +17,7 @@
     <el-menu-item index="appManage">
       <span class="fw-bold fs-6">应用管理器</span>
     </el-menu-item>
-    <el-menu-item index="3">
+    <el-menu-item index="logcat">
       <span class="fw-bold fs-6">实时日志</span>
     </el-menu-item>
     <el-menu-item index="terminal">
@@ -65,12 +65,12 @@ const deviceBatteryInfo = async () => {
     const levelRegex = /level: (\d+)/;
     const temperatureRegex = /temperature: (\d+)/;
     const voltageRegex = /voltage: (\d+)/;
-    
+
     const usbPoweredMatch = res.match(usbPoweredRegex);
     const levelMatch = res.match(levelRegex);
     const temperatureMatch = res.match(temperatureRegex);
     const voltageMatch = res.match(voltageRegex);
-    
+
     const usbPowered = usbPoweredMatch ? usbPoweredMatch[1] : null;
     const level = levelMatch ? levelMatch[1] : null;
     const temperature = temperatureMatch ? temperatureMatch[1] : null;

@@ -3,6 +3,7 @@ import HomeView from '@/pages/home/home.vue';
 import OverView from '@/pages/overview/overview.vue';
 import FileManage from "@/pages/fileManage/fileManage.vue";
 import AppManage from "@/pages/appManage/appManage.vue";
+import androidLogcat from "@/pages/androidLogcat/logcat.vue"
 import Terminal from '@/pages/terminal/Terminal.vue';
 import screenControl from '@/pages/scrcpyShow/scrcpy.vue';
 
@@ -26,6 +27,11 @@ const routes = [
         path: '/appManage',
         name: 'AppManage',
         component: AppManage,
+    },
+    {
+        path: '/logcat',
+        name: 'androidLogcat',
+        component: androidLogcat,
     },
     {
         path: '/terminal',
