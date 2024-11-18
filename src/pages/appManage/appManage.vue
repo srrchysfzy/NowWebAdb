@@ -1,153 +1,158 @@
 <template>
-  <div class="d-flex justify-content-between">
-    <el-space>
-      <el-input v-model="searchPackage" :style="{width: width - 120 + 'px'}" placeholder="请输入名称或包名进行搜索">
-        <template #prefix>
-          <span>🔍</span>
-        </template>
-      </el-input>
-    </el-space>
-    <el-space>
-      <el-button type="primary" @click="getAppIcon">初始化</el-button>
-    </el-space>
-  </div>
-
-
-  <el-space class="mt-4" :size="40">
-    <el-space style="cursor: pointer" @click="createNewFolder">
-      <SvgIcon icon="packageDelete"/>
-      <span>卸载</span>
-    </el-space>
-    <el-space style="cursor: pointer" @click="createNewFolder">
-      <SvgIcon icon="packageSave"/>
-      <span>备份</span>
-    </el-space>
-    <el-space style="cursor: pointer" @click="createNewFolder">
-      <SvgIcon icon="packageExport"/>
-      <span>导出Apk</span>
-    </el-space>
-    <el-space style="cursor: pointer" @click="createNewFolder">
-      <SvgIcon icon="packageInfo"/>
-      <span>详细信息</span>
-    </el-space>
-  </el-space>
-  <div class="card mt-4">
-    <div class="card-header">
-      <el-row :gutter="10">
-        <el-col :span="10">
-          <el-space>
-            <el-icon v-if="selectStatus === 0" style="margin-right: 50px;margin-left: 10px;cursor: pointer" :size="20"
-                     @click="handleSelectAll">
-              <CircleCheck/>
-            </el-icon>
-            <el-icon v-if="selectStatus === 2 || selectStatus === 3"
-                     style="margin-right: 50px;margin-left: 10px;cursor: pointer" :size="20"
-                     color="#409EFF" @click="handleSelectAll">
-              <RemoveFilled/>
-            </el-icon>
-            <el-icon v-if="selectStatus === 1" style="margin-right: 50px;margin-left: 10px;cursor: pointer" :size="20"
-                     color="#409EFF" @click="handleSelectAll">
-              <CircleCheckFilled/>
-            </el-icon>
-
-            <span>名称</span>
-            <el-icon v-if="sortType === 'desc'" :size="18" style="cursor: pointer" @click="sortFileList('asc')">
-              <Bottom/>
-            </el-icon>
-            <el-icon v-else :size="18" style="cursor: pointer;margin-top: 3px" @click="sortFileList('desc')">
-              <Top/>
-            </el-icon>
-          </el-space>
-        </el-col>
-        <el-col :span="14">
-          <span style="margin-right: 45px">来源</span>
-          <span>大小</span>
-          <div style="margin-left: 160px; margin-top: -24px" class="d-flex justify-content-between">
-            <span>安装时间</span>
-            <span>最后使用时间</span>
-            <span style="margin-right: 15px">操作</span>
-          </div>
-        </el-col>
-      </el-row>
+  <div class="mx-4">
+    <div class="d-flex justify-content-between">
+      <el-space>
+        <el-input v-model="searchPackage" :style="{width: width - 180 + 'px'}" placeholder="请输入名称或包名进行搜索">
+          <template #prefix>
+            <span>🔍</span>
+          </template>
+        </el-input>
+      </el-space>
+      <el-space>
+        <el-button type="primary" @click="getAppIcon">初始化</el-button>
+      </el-space>
     </div>
-    <el-scrollbar :style="{height: height-250 + 'px'}">
-      <div class="card-body">
-        <div v-if="appItemList.length > 0">
 
-          <el-row
-              v-for="(appItem, index) in appItemList"
-              :key="index" class="fileItemCss"
-              :style="appItem.isSelect?{backgroundColor: '#d1dbf5'}:''"
-              :gutter="10"
-              style="margin-left: -16px; margin-right: -16px" @click="getCurrentAppItem(appItem)">
-            <el-col :span="10">
-              <el-space>
-                <div v-if="appItem.isSelect" @click.stop="handelSelectItem(appItem)"
-                     style="margin-right: 14px;margin-left: 21px;margin-top: -3px">
-                  <SvgIcon icon="RoundCheckIcon" color="#409EFF"/>
-                </div>
-                <div v-else class="hidden-icon" @click.stop="handelSelectItem(appItem)">
-                  <SvgIcon icon="RoundIcon"/>
-                </div>
-                <el-image v-if="appItem.IconBase64 === 'data:image/png;base64,' || appItem.IconBase64 === ''" :src="androidPack" :style="{width: 40 + 'px', height: 40 + 'px', borderRadius: 12 +'px'}" fit="fill"/>
-                <el-image v-else :src="appItem.IconBase64" :style="{width: 40 + 'px', height: 40 + 'px', borderRadius: 12 +'px'}" fit="fill"/>
-                <!--                <el-avatar shape="square" :size="40" :src="appItem.IconBase64" />-->
-                <span class="fileNameCss">{{ appItem.appName }}</span>
-              </el-space>
-            </el-col>
-            <el-col :span="14">
-              <div style="margin-top: 8px">
-                <span>{{ appItem.appSource }}</span>
-              </div>
-              <div style="margin-left: 90px;margin-top: -25px" >
-                <span v-if="appItem.numType === 8">{{ appItem.size }}</span>
-                <span v-else>--</span>
-              </div>
-              <div style="margin-left: 160px; margin-top: -20px" class="d-flex justify-content-between">
-                <span>{{ appItem.createTime }}</span>
-                <span>{{ appItem.modifyTime }}</span>
-                <el-popover
-                    placement="right"
-                    trigger="click"
-                    width="170"
-                    :popper-style="{padding: 7 + 'px'}"
-                >
-                  <template #reference>
-                    <el-icon style="margin-right: 32px; margin-left: 9px;" :size="18" @click.stop>
-                      <More/>
-                    </el-icon>
-                  </template>
-                  <template #default>
-                    <el-space class="operationItemCss" @click="rightDownloadFile(appItem.name, appItem.numType)">
-                      <SvgIcon style="margin-left: 9px" icon="DownloadIcon"/>
-                      <span class="mx-2">在设备上启动</span>
-                    </el-space>
-                    <el-space class="operationItemCss" @click="renameFile(appItem.name)">
-                      <SvgIcon style="margin-left: 9px" icon="RenameIcon"/>
-                      <span class="mx-2">卸载</span>
-                    </el-space>
-                    <el-space class="operationItemCss" @click="deleteFileSingle(appItem.name, appItem.numType)">
-                      <SvgIcon style="margin-left: 9px" icon="DeleteIcon"/>
-                      <span class="mx-2">备份</span>
-                    </el-space>
-                    <el-space class="operationItemCss" @click="getFileDetail(appItem.name)">
-                      <SvgIcon style="margin-left: 12px" icon="InfoIcon"
-                               :style="{ width:18 + 'px', height: 18 + 'px'}"/>
-                      <span style="margin-left: 9px">导出Apk</span>
-                    </el-space>
-                    <el-space class="operationItemCss" @click="deleteFileSingle(appItem.name, appItem.numType)">
-                      <SvgIcon style="margin-left: 9px" icon="DeleteIcon"/>
-                      <span class="mx-2">详细信息</span>
-                    </el-space>
-                  </template>
-                </el-popover>
-              </div>
-            </el-col>
-          </el-row>
-        </div>
-        <el-empty v-else description="暂无文件"/>
+
+    <el-space class="mt-4" :size="40">
+      <el-space style="cursor: pointer" @click="createNewFolder">
+        <SvgIcon icon="packageDelete"/>
+        <span>卸载</span>
+      </el-space>
+      <el-space style="cursor: pointer" @click="createNewFolder">
+        <SvgIcon icon="packageSave"/>
+        <span>备份</span>
+      </el-space>
+      <el-space style="cursor: pointer" @click="createNewFolder">
+        <SvgIcon icon="packageExport"/>
+        <span>导出Apk</span>
+      </el-space>
+      <el-space style="cursor: pointer" @click="createNewFolder">
+        <SvgIcon icon="packageInfo"/>
+        <span>详细信息</span>
+      </el-space>
+    </el-space>
+    <div class="card mt-4">
+      <div class="card-header">
+        <el-row :gutter="10">
+          <el-col :span="10">
+            <el-space>
+              <el-icon v-if="selectStatus === 0" style="margin-right: 50px;margin-left: 10px;cursor: pointer" :size="20"
+                       @click="handleSelectAll">
+                <CircleCheck/>
+              </el-icon>
+              <el-icon v-if="selectStatus === 2 || selectStatus === 3"
+                       style="margin-right: 50px;margin-left: 10px;cursor: pointer" :size="20"
+                       color="#409EFF" @click="handleSelectAll">
+                <RemoveFilled/>
+              </el-icon>
+              <el-icon v-if="selectStatus === 1" style="margin-right: 50px;margin-left: 10px;cursor: pointer" :size="20"
+                       color="#409EFF" @click="handleSelectAll">
+                <CircleCheckFilled/>
+              </el-icon>
+
+              <span>名称</span>
+              <el-icon v-if="sortType === 'desc'" :size="18" style="cursor: pointer" @click="sortFileList('asc')">
+                <Bottom/>
+              </el-icon>
+              <el-icon v-else :size="18" style="cursor: pointer;margin-top: 3px" @click="sortFileList('desc')">
+                <Top/>
+              </el-icon>
+            </el-space>
+          </el-col>
+          <el-col :span="14">
+            <span style="margin-right: 45px">来源</span>
+            <span>大小</span>
+            <div style="margin-left: 160px; margin-top: -24px" class="d-flex justify-content-between">
+              <span>安装时间</span>
+              <span>最后使用时间</span>
+              <span style="margin-right: 15px">操作</span>
+            </div>
+          </el-col>
+        </el-row>
       </div>
-    </el-scrollbar>
+      <el-scrollbar :style="{height: height-250 + 'px'}">
+        <div class="card-body">
+          <div v-if="appItemList.length > 0">
+
+            <el-row
+                v-for="(appItem, index) in appItemList"
+                :key="index" class="fileItemCss"
+                :style="appItem.isSelect?{backgroundColor: '#d1dbf5'}:''"
+                :gutter="10"
+                style="margin-left: -16px; margin-right: -16px" @click="getCurrentAppItem(appItem)">
+              <el-col :span="10">
+                <el-space>
+                  <div v-if="appItem.isSelect" @click.stop="handelSelectItem(appItem)"
+                       style="margin-right: 14px;margin-left: 21px;margin-top: -3px">
+                    <SvgIcon icon="RoundCheckIcon" color="#409EFF"/>
+                  </div>
+                  <div v-else class="hidden-icon" @click.stop="handelSelectItem(appItem)">
+                    <SvgIcon icon="RoundIcon"/>
+                  </div>
+                  <el-image v-if="appItem.IconBase64 === 'data:image/png;base64,' || appItem.IconBase64 === ''"
+                            :src="androidPack" :style="{width: 40 + 'px', height: 40 + 'px', borderRadius: 12 +'px'}"
+                            fit="fill"/>
+                  <el-image v-else :src="appItem.IconBase64"
+                            :style="{width: 40 + 'px', height: 40 + 'px', borderRadius: 12 +'px'}" fit="fill"/>
+                  <!--                <el-avatar shape="square" :size="40" :src="appItem.IconBase64" />-->
+                  <span class="fileNameCss">{{ appItem.appName }}</span>
+                </el-space>
+              </el-col>
+              <el-col :span="14">
+                <div style="margin-top: 8px">
+                  <span>{{ appItem.appSource }}</span>
+                </div>
+                <div style="margin-left: 90px;margin-top: -25px">
+                  <span v-if="appItem.numType === 8">{{ appItem.size }}</span>
+                  <span v-else>--</span>
+                </div>
+                <div style="margin-left: 160px; margin-top: -20px" class="d-flex justify-content-between">
+                  <span>{{ appItem.createTime }}</span>
+                  <span>{{ appItem.modifyTime }}</span>
+                  <el-popover
+                      placement="right"
+                      trigger="click"
+                      width="170"
+                      :popper-style="{padding: 7 + 'px'}"
+                  >
+                    <template #reference>
+                      <el-icon style="margin-right: 32px; margin-left: 9px;" :size="18" @click.stop>
+                        <More/>
+                      </el-icon>
+                    </template>
+                    <template #default>
+                      <el-space class="operationItemCss" @click="rightDownloadFile(appItem.name, appItem.numType)">
+                        <SvgIcon style="margin-left: 9px" icon="DownloadIcon"/>
+                        <span class="mx-2">在设备上启动</span>
+                      </el-space>
+                      <el-space class="operationItemCss" @click="renameFile(appItem.name)">
+                        <SvgIcon style="margin-left: 9px" icon="RenameIcon"/>
+                        <span class="mx-2">卸载</span>
+                      </el-space>
+                      <el-space class="operationItemCss" @click="deleteFileSingle(appItem.name, appItem.numType)">
+                        <SvgIcon style="margin-left: 9px" icon="DeleteIcon"/>
+                        <span class="mx-2">备份</span>
+                      </el-space>
+                      <el-space class="operationItemCss" @click="getFileDetail(appItem.name)">
+                        <SvgIcon style="margin-left: 12px" icon="InfoIcon"
+                                 :style="{ width:18 + 'px', height: 18 + 'px'}"/>
+                        <span style="margin-left: 9px">导出Apk</span>
+                      </el-space>
+                      <el-space class="operationItemCss" @click="deleteFileSingle(appItem.name, appItem.numType)">
+                        <SvgIcon style="margin-left: 9px" icon="DeleteIcon"/>
+                        <span class="mx-2">详细信息</span>
+                      </el-space>
+                    </template>
+                  </el-popover>
+                </div>
+              </el-col>
+            </el-row>
+          </div>
+          <el-empty v-else description="暂无文件"/>
+        </div>
+      </el-scrollbar>
+    </div>
   </div>
 </template>
 
@@ -202,7 +207,7 @@ const testReadAppInfo = async () => {
   if (!isServiceRunning) {
     console.log("服务未开启，尝试开启服务")
     console.log("准备推送apkans.jar")
-    await pushServerAndStartScrcpyClient(adb,'/apkans.jar', false)
+    await pushServerAndStartScrcpyClient(adb, '/apkans.jar', false)
     await adb.subprocess.spawn(
         "CLASSPATH=/data/local/tmp/apkans.jar nohup app_process / com.lyx.myapplication.Main > /dev/null 2>&1 &"
     );
@@ -324,7 +329,7 @@ const getCurrentAppItem = (name) => {
 }
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-const initPmObj = async (isShowThirdParty=true) => {
+const initPmObj = async (isShowThirdParty = true) => {
   console.log("初始化应用管理器");
   let adb = await getAdbInstance();
   const pm = new PackageManager(adb);
@@ -382,6 +387,7 @@ onMounted(() => {
     background-color: #dedfe0;
   }
 }
+
 /* 新增规则：隐藏 SvgIcon 默认不可见 */
 .hidden-icon {
   margin-right: 14px;
@@ -395,6 +401,7 @@ onMounted(() => {
 .fileItemCss:hover .hidden-icon {
   opacity: 1; /* 完全可见 */
 }
+
 .operationItemCss {
   cursor: pointer;
   height: 40px;
