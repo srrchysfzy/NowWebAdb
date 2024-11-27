@@ -3,7 +3,9 @@
     <template #header>
       <div class="d-flex justify-content-between">
         <el-space size="large">
-          <el-button v-if="!startLogcatFlag" type="primary" plain round :icon="VideoPlay" @click="startLogcat">开始日志</el-button>
+          <el-button v-if="!startLogcatFlag" type="primary" plain round :icon="VideoPlay" @click="startLogcat">
+            开始日志
+          </el-button>
           <el-button v-else type="danger" plain round :icon="SwitchButton" @click="stopLogcat">停止日志</el-button>
           <el-button type="warning" plain round :icon="Delete" @click="clearLogcat">清空日志</el-button>
           <el-button type="info" plain round :icon="FolderAdd" @click="saveLogcat">保存日志</el-button>
@@ -34,124 +36,94 @@
         <span>日志内容</span>
       </el-col>
     </el-row>
-    <ShowLog :source="logData" :columns="columns" ref="logCatTableRef" @scroll="handleScroll"/>
+    <ShowLog :source="logData" ref="logCatTableRef"/>
   </el-card>
 </template>
 <script setup>
-import {Logcat, AndroidLogPriority, LogId} from "@yume-chan/android-bin";
-import {WritableStream, AbortController} from "@yume-chan/stream-extra";
+import {AndroidLogPriority, Logcat, LogId} from "@yume-chan/android-bin";
+import {AbortController, WritableStream} from "@yume-chan/stream-extra";
 import {getAdbInstance} from "@/utils/adbManager.js";
-import {VideoPlay, Delete, FolderAdd, SwitchButton} from "@element-plus/icons-vue";
-import useWindowResize from "@/utils/useWindowResize.js";
+import {Delete, FolderAdd, SwitchButton, VideoPlay} from "@element-plus/icons-vue";
 import timestampToFormattedDate from "@/utils/timeUtils.js";
 import ShowLog from "@/pages/androidLogcat/showLog.vue";
 
-
-const {width, height} = useWindowResize()
+const logCatTableRef = ref()
 const startLogcatFlag = ref(false);
 const searchText = ref('')
 const logData = ref([])
-let stopSignal
-const columns = computed(() => [
-  {
-    title: 'Time',
-    key: 'second',
-    dataKey: 'second',
-    minWidth: 170,
-  },
-  {
-    title: 'PID',
-    key: 'pid',
-    dataKey: 'pid',
-    minWidth: 70,
-  },
-  {
-    title: 'TID',
-    key: 'tid',
-    dataKey: 'tid',
-    minWidth: 70,
-  },
-  {
-    title: 'Level',
-    key: 'level',
-    dataKey: 'level',
-    minWidth: 100,
-  },
-  {
-    title: 'LogId',
-    key: 'id',
-    dataKey: 'id',
-    minWidth: 70,
-  },
-  {
-    title: 'Tag',
-    key: 'tag',
-    dataKey: 'tag',
-    width: 300,
-  },
-  {
-    title: 'Message',
-    key: 'message',
-    dataKey: 'message',
-    width: width.value,
-  },
-])
+const stopSignal = ref();
+const buffer = ref([]);
+const flushRequested = ref(false);
+const stream = ref();
 const testGetColumns = async () => {
-  console.log(columns.value)
+  console.log(logData.value)
 }
-const startLogcat = async () => {
-  let adb = await getAdbInstance();
+
+const startLogcat = () => {
+  let adb = getAdbInstance();
   const logcat = new Logcat(adb);
-  const logStream = logcat.binary({dump: true});
-  startLogcatFlag.value = true
-  stopSignal = new AbortController()
+  if (startLogcatFlag.value) {
+    return;
+  }
+
+  logData.value = [];
+  startLogcatFlag.value = true;
+  stream.value = logcat.binary();
+  stopSignal.value = new AbortController();
   let key = 0
-  let buffer = []
+  stream.value
+      .pipeTo(
+          new WritableStream({
+            write: (chunk) => {
+              key++
+              let newChunk = {
+                second: timestampToFormattedDate(chunk.seconds),
+                pid: chunk.pid,
+                tid: chunk.tid,
+                level: AndroidLogPriority[chunk.priority],
+                tag: chunk.tag,
+                message: chunk.message,
+                logId: LogId[chunk.logId],
+                id: key
+              }
+              buffer.value.push(newChunk);
+              if (!flushRequested.value) {
+                flushRequested.value = true;
+                requestAnimationFrame(flush);
+              }
+            },
+          }),
+          {signal: stopSignal.value.signal}
+      )
+      .catch((e) => {
+        if (stopSignal.value.abort) {
+          return;
+        }
 
-  await logStream.pipeTo(new WritableStream({
-    write: (chunk) => {
-      key++
-      let newChunk = {
-        second: timestampToFormattedDate(chunk.seconds),
-        pid: chunk.pid,
-        tid: chunk.tid,
-        level: AndroidLogPriority[chunk.priority],
-        tag: chunk.tag,
-        message: chunk.message,
-        logId: LogId[chunk.logId],
-        id: key
-      }
-      logData.value.push(newChunk)
-
-      // if (buffer.length >= 10) { // 每100条数据批量更新
-      //   logData.value = [...logData.value, ...buffer]
-      //   buffer = []
-      // }
-    },
-  }), { signal: stopSignal.signal })
-
-  // // 处理剩余的数据
-  // if (buffer.length > 0) {
-  //   logData.value = [...logData.value, ...buffer]
-  // }
-}
+        throw e;
+      });
+    // 延迟2秒后开始滚动到底部
+  setTimeout(() => {
+    watch(() => logData.value, () => {
+      logCatTableRef.value.scrollToBottom();
+    }, { deep: true });
+  }, 5000);
+};
+const flush = () => {
+  logData.value.push(...buffer.value);
+  buffer.value = [];
+  flushRequested.value = false;
+};
 const stopLogcat = async () => {
   startLogcatFlag.value = false
-  stopSignal.abort()
+  stopSignal.value.abort();
 }
 const clearLogcat = async () => {
   logData.value = []
 }
 const saveLogcat = async () => {
-  console.log('save logcat')
+  console.log('saveLogcat')
 }
-const logCatTableRef = ref();
-const isAtBottom = ref(true); // 是否滚动条在底部
-
-// 滚动事件处理，判断是否滚动到底部
-const handleScroll = () => {
-  // isAtBottom.value = false
-};
 </script>
 <style scoped>
 
