@@ -2,26 +2,22 @@ import { ref, computed } from 'vue';
 import { InspectStream, ReadableStream } from '@yume-chan/stream-extra';
 import { getAdbInstance } from '@/utils/adbManager.js';
 import { VERSION } from '@yume-chan/fetch-scrcpy-server';
-import { AdbScrcpyClient, AdbScrcpyOptionsLatest } from '@yume-chan/adb-scrcpy';
+import { AdbScrcpyClient, AdbScrcpyOptions3_2 } from '@yume-chan/adb-scrcpy';
 import {
-    CodecOptions,
     ScrcpyVideoCodecId,
-    DEFAULT_SERVER_PATH,
-    ScrcpyInstanceId,
-    ScrcpyLogLevel,
-    ScrcpyOptionsLatest,
     h264ParseConfiguration,
     h265ParseConfiguration,
     AndroidMotionEventAction,
-    ScrcpyPointerId,
+    ScrcpyInstanceId,
     AndroidMotionEventButton,
-    ScrcpyHoverHelper,
     AndroidKeyEventAction,
     AndroidKeyCode,
     AndroidKeyEventMeta,
+    DefaultServerPath,
+    ScrcpyPointerId,
 } from '@yume-chan/scrcpy';
 import { DEFAULT_SETTINGS } from '@/utils/scrcpySettings.js';
-import { WebCodecsVideoDecoder } from '@yume-chan/scrcpy-decoder-webcodecs';
+import { WebCodecsVideoDecoder, WebGLVideoFrameRenderer } from '@yume-chan/scrcpy-decoder-webcodecs';
 import { clamp } from "lodash";
 import useWindowResize from "@/utils/useWindowResize.js";
 import {pushServerAndStartScrcpyClient} from "@/utils/adbUtils.js";
@@ -30,10 +26,12 @@ const useScrcpy = () => {
     let options
     let client
     let rotation = 0
-    let hoverHelper
     let videoStream
     let aspectRatio
     let decoder = null;
+    // 设备真实分辨率（用于触控坐标计算）
+    let deviceRealWidth = 0;
+    let deviceRealHeight = 0;
     const width = ref(0)
     const height = ref(0)
     const {height: windowHeight, width: windowWidth} = useWindowResize();
@@ -87,9 +85,7 @@ const useScrcpy = () => {
         } else {
             if (openInput.value) {
                 await handleKeyCode(e);
-            } else {
-                console.log('移除键盘监听事件', e);
-            }
+                    }
         }
     };
 
@@ -98,11 +94,10 @@ const useScrcpy = () => {
      */
     const scrcpyStart = async (renderRef) => {
         try {
-            console.log('Scrcpy 版本:', VERSION);
-            console.log('renderRef', renderRef.renderContainer)
+            // console.log('Scrcpy 版本:', VERSION);
             renderContainer.value = renderRef.renderContainer;
-            const adb = await adbInstance.value;
-            await pushServerAndStartScrcpyClient(adb,'/server.bin')
+            const adb = adbInstance.value;
+            await pushServerAndStartScrcpyClient(adb, '/server.bin');
             console.log('服务端已推送');
 
             await startScrcpyClient(adb);
@@ -112,39 +107,70 @@ const useScrcpy = () => {
     };
 
     /**
+     * 获取设备真实分辨率
+     * @param {Object} adb ADB 实例
+     */
+    const getDeviceRealResolution = async (adb) => {
+        try {
+            // 使用 ADB 命令获取设备分辨率
+            if (adb.subprocess.shellProtocol?.isSupported) {
+                const result = await adb.subprocess.shellProtocol.spawnWaitText('wm size');
+                
+                // 解析输出，格式通常是 "Physical size: 2160x1080"
+                const match = result.stdout.match(/(\d+)x(\d+)/);
+                if (match) {
+                    deviceRealWidth = parseInt(match[1]);
+                    deviceRealHeight = parseInt(match[2]);
+                    return true;
+                }
+            }
+        } catch (error) {
+            // 忽略错误，使用默认值
+        }
+        
+        // 如果 ADB 命令失败，手动设置已知的设备分辨率
+        deviceRealWidth = 1080;
+        deviceRealHeight = 2160;
+        return true;
+    };
+
+    /**
      * 启动 scrcpy 客户端并初始化视频流
-     * @param  adb ADB 实例
+     * @param adb ADB 实例
      */
     const startScrcpyClient = async (adb) => {
         try {
-            const videoCodecOptions = new CodecOptions();
-            options = new AdbScrcpyOptionsLatest(
-                new ScrcpyOptionsLatest({
-                    ...DEFAULT_SETTINGS,
-                    logLevel: ScrcpyLogLevel.Debug,
-                    scid: ScrcpyInstanceId.random(),
-                    sendDeviceMeta: true,
-                    sendDummyByte: true,
-                    videoCodecOptions,
-                })
-            );
-
-            // 创建 ScrcpyHoverHelper 实例
-            hoverHelper = new ScrcpyHoverHelper();
+            // 首先获取设备真实分辨率
+            await getDeviceRealResolution(adb);
+            
+            options = new AdbScrcpyOptions3_2({
+                ...DEFAULT_SETTINGS,
+                scid: ScrcpyInstanceId.random(),
+            });
 
             // 启动 scrcpy 客户端
-            client = await AdbScrcpyClient.start(adb, DEFAULT_SERVER_PATH, VERSION, options);
-            client.stdout.pipeTo(new WritableStream({
+            client = await AdbScrcpyClient.start(adb, DefaultServerPath, options);
+            
+            // 处理服务器输出
+            client.output.pipeTo(new WritableStream({
                 write: (line) => {
-                    console.log('stdout:', line);
+                    console.log('scrcpy server:', line);
                 },
-            })).then(r =>  console.log('pipeTo', r));
+            })).catch(e => console.error('output stream error:', e));
 
+            // 获取视频流
             videoStream = await client.videoStream;
 
             if (videoStream) {
                 initializeVideoStream(videoStream);
                 console.log('视频流已启动');
+            }
+
+                        // 检查控制器状态
+            if (client.controller) {
+                console.log('控制器已初始化，可以进行触控操作');
+            } else {
+                console.error('控制器未初始化，无法进行触控操作');
             }
         } catch (error) {
             console.error('启动 scrcpy 客户端时出错:', error);
@@ -160,9 +186,19 @@ const useScrcpy = () => {
         console.log('视频元数据:', metadata);
         console.log('视频元数据的 codec:', metadata.codec);
 
-        // 设置宽高
+        // 设置视频流的宽高（可能是缩放后的）
         width.value = metadata.width;
         height.value = metadata.height;
+
+        // 尝试获取设备真实分辨率
+        if (metadata.deviceWidth && metadata.deviceHeight) {
+            deviceRealWidth = metadata.deviceWidth;
+            deviceRealHeight = metadata.deviceHeight;
+        } else if (deviceRealWidth === 0 || deviceRealHeight === 0) {
+            // 只有在之前没有设置过真实分辨率时才使用视频流分辨率
+            deviceRealWidth = metadata.width;
+            deviceRealHeight = metadata.height;
+        }
 
         // 初始化解码器
         initializeDecoder(videoPacketStream, metadata);
@@ -176,16 +212,21 @@ const useScrcpy = () => {
      */
     const initializeDecoder = (videoPacketStream, metadata) => {
         try {
-            // 设置解码器
-            decoder = new WebCodecsVideoDecoder(ScrcpyVideoCodecId.H264, true);
+            // 创建渲染器
+            const renderer = new WebGLVideoFrameRenderer();
+            
+            // 设置解码器，使用实际的 codec
+            decoder = new WebCodecsVideoDecoder({
+                codec: metadata.codec,
+                renderer: renderer
+            });
 
             // 检查并附加渲染器
             if (!renderContainer.value) {
                 console.error('渲染容器未找到');
                 return;
             }
-            renderContainer.value.appendChild(decoder.renderer);
-            console.log('添加渲染器到容器:', decoder.renderer);
+            renderContainer.value.appendChild(renderer.canvas);
 
             // 重置关键帧跟踪
             lastKeyframe.value = 0n;
@@ -193,13 +234,11 @@ const useScrcpy = () => {
             // 处理视频包
             const handler = new InspectStream((packet) => handlePacket(packet, metadata));
 
-            // 绑定滚轮事件
-            handleWheelTest();
+            // 事件已通过 Vue 模板绑定，无需重复绑定
 
             // 连接视频流
             if (videoPacketStream && typeof videoPacketStream.pipeTo === 'function') {
-                videoPacketStream.pipeThrough(handler).pipeTo(decoder.writable).then(r =>  console.log('pipeTo', r));
-                console.log('视频流已连接到解码器');
+                videoPacketStream.pipeThrough(handler).pipeTo(decoder.writable);
             } else {
                 console.error('videoPacketStream 无效或不可用');
             }
@@ -268,7 +307,9 @@ const useScrcpy = () => {
         console.log('计算后的宽高:', calcWidth, calcHeight);
 
         // 更新渲染器样式
-        setRendererStyle(decoder.renderer, calcWidth, calcHeight);
+        if (decoder && decoder.renderer) {
+            setRendererStyle(decoder.renderer.canvas, calcWidth, calcHeight);
+        }
 
         // 更新容器样式
         updateContainerStyle(calcWidth, calcHeight);
@@ -337,20 +378,41 @@ const useScrcpy = () => {
      * @returns {Object} 设备坐标对象 { x, y }
      */
     const clientPositionToDevicePosition = (clientX, clientY) => {
-        if (!renderContainer.value) {
-            return {x: 0, y: 0}; // 如果渲染容器不存在，返回默认坐标
+        // 使用实际的 canvas 元素进行坐标计算
+        const canvas = decoder?.renderer?.canvas;
+        if (!canvas) {
+            console.warn('Canvas 未找到，使用容器进行坐标计算');
+            if (!renderContainer.value) {
+                return {x: 0, y: 0};
+            }
+            const viewRect = renderContainer.value.getBoundingClientRect();
+            const pointerViewX = clamp((clientX - viewRect.x) / viewRect.width, 0, 1);
+            const pointerViewY = clamp((clientY - viewRect.y) / viewRect.height, 0, 1);
+            const adjustedPosition = adjustPositionForRotation(pointerViewX, pointerViewY, rotation);
+            return {
+                x: adjustedPosition.x * width.value,
+                y: adjustedPosition.y * height.value,
+            };
         }
 
-        const viewRect = renderContainer.value.getBoundingClientRect();
-        const pointerViewX = clamp((clientX - viewRect.x) / viewRect.width, 0, 1);
-        const pointerViewY = clamp((clientY - viewRect.y) / viewRect.height, 0, 1);
+        const canvasRect = canvas.getBoundingClientRect();
+        const pointerViewX = clamp((clientX - canvasRect.x) / canvasRect.width, 0, 1);
+        const pointerViewY = clamp((clientY - canvasRect.y) / canvasRect.height, 0, 1);
+
+
 
         // 根据旋转调整坐标
         const adjustedPosition = adjustPositionForRotation(pointerViewX, pointerViewY, rotation);
 
+        // 根据官方文档，坐标应该基于视频尺寸，而不是设备真实分辨率
+        const videoX = clamp(adjustedPosition.x * width.value, 0, width.value - 1);
+        const videoY = clamp(adjustedPosition.y * height.value, 0, height.value - 1);
+
+
+
         return {
-            x: adjustedPosition.x * width.value,
-            y: adjustedPosition.y * height.value,
+            x: videoX,
+            y: videoY,
         };
     };
 
@@ -384,10 +446,7 @@ const useScrcpy = () => {
         return {x: adjustedX, y: adjustedY};
     };
 
-// 事件处理器注册
-    const handleWheelTest = () => {
-        renderContainer.value.addEventListener("wheel", handleWheel, {passive: false});
-    };
+// 事件处理器已通过 Vue 模板绑定
 
     /**
      * 防止事件的默认行为和传播
@@ -405,16 +464,26 @@ const useScrcpy = () => {
     const handleWheel = async (event) => {
         preventEventDefaults(event); // 预防默认事件行为
 
+        if (!client || !client.controller) {
+            console.error('客户端或控制器未初始化');
+            return;
+        }
+
         const {x, y} = clientPositionToDevicePosition(event.clientX, event.clientY);
-        await client.controller.injectScroll({
-            pointerX: x,
-            pointerY: y,
-            screenWidth: width.value,
-            screenHeight: height.value,
-            scrollX: -event.deltaX / 100,
-            scrollY: -event.deltaY / 100,
-            buttons: 0,
-        });
+        
+        try {
+            await client.controller.injectScroll({
+                pointerX: x,
+                pointerY: y,
+                videoWidth: width.value,
+                videoHeight: height.value,
+                scrollX: -event.deltaX / 100,
+                scrollY: -event.deltaY / 100,
+                buttons: 0,
+            });
+        } catch (error) {
+            console.error('滚轮事件注入失败:', error);
+        }
     };
 
     /**
@@ -423,26 +492,33 @@ const useScrcpy = () => {
      * @param {PointerEvent} event 触控事件
      */
     const injectTouch = async (action, event) => {
-        const pointerId = (event.pointerType === "mouse")
-            ? ScrcpyPointerId.Finger // Android 13 has bug with mouse injection
-            : BigInt(event.pointerId);
+        if (!client || !client.controller) {
+            console.error('客户端或控制器未初始化');
+            return;
+        }
 
+        // 使用官方推荐的 ScrcpyPointerId.Finger
+        const pointerId = ScrcpyPointerId.Finger;
         const {x, y} = clientPositionToDevicePosition(event.clientX, event.clientY);
 
-        const messages = hoverHelper.process({
-            action,
-            pointerId,
-            screenWidth: width.value,
-            screenHeight: height.value,
-            pointerX: x,
-            pointerY: y,
-            pressure: event.pressure,
-            actionButton: MOUSE_EVENT_BUTTON_TO_ANDROID_BUTTON[event.button],
-            buttons: event.buttons,
-        });
+        // 确保压力值有效，根据官方文档示例
+        const pressure = event.buttons === 0 ? 0 : 1;
+        const actionButton = MOUSE_EVENT_BUTTON_TO_ANDROID_BUTTON[event.button] || MOUSE_EVENT_BUTTON_TO_ANDROID_BUTTON[0];
 
-        for (const message of messages) {
-            await client.controller.injectTouch(message);
+        try {
+            await client.controller.injectTouch({
+                action,
+                pointerId,
+                videoWidth: width.value,
+                videoHeight: height.value,
+                pointerX: x,
+                pointerY: y,
+                pressure,
+                actionButton,
+                buttons: event.buttons,
+            });
+        } catch (error) {
+            console.error('触控事件注入失败:', error);
         }
     };
 
@@ -462,7 +538,16 @@ const useScrcpy = () => {
      */
     const handlePointerMove = async (event) => {
         preventEventDefaults(event);
-        const action = event.buttons === 0 ? AndroidMotionEventAction.HoverMove : AndroidMotionEventAction.Move;
+        
+        let action;
+        if (event.buttons === 0) {
+            // 根据官方文档，悬停时使用 HoverMove
+            action = AndroidMotionEventAction.HoverMove;
+                 } else {
+             // 拖拽时使用 Move
+             action = AndroidMotionEventAction.Move;
+         }
+        
         await injectTouch(action, event);
     };
 
@@ -481,8 +566,11 @@ const useScrcpy = () => {
      */
     const handlePointerLeave = async (event) => {
         preventEventDefaults(event);
-        await injectTouch(AndroidMotionEventAction.HoverExit, event);
-        await injectTouch(AndroidMotionEventAction.Up, event);
+        // 如果有按钮按下，发送抬起事件
+        if (event.buttons > 0) {
+            await injectTouch(AndroidMotionEventAction.Up, event);
+        }
+        // 不发送 HoverExit，因为这不是正常的触控操作
     };
 
     /**
@@ -541,9 +629,10 @@ const useScrcpy = () => {
         }
 
         if (decoder) {
-            if (decoder.renderer && container) {
-                container.removeChild(decoder.renderer);
+            if (decoder.renderer && decoder.renderer.canvas && container) {
+                container.removeChild(decoder.renderer.canvas);
             }
+            decoder.dispose();
             decoder = null;
         }
     }
@@ -569,6 +658,7 @@ const useScrcpy = () => {
         handlePointerUp,
         handlePointerLeave,
         handleContextMenu,
+        handleWheel,
         scrcpyStart,
         destroyClient,
     };

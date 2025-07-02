@@ -333,19 +333,47 @@ const searchFile = () => {
 }
 // 将类似这种1533657660n的bigint转换为xxxx-xx-xx xx:xx:xx格式
 const timestampToTime = (bigIntValue) => {
-  // 转换为毫秒级别的时间戳
-  const timestamp = Number(bigIntValue) * 1000;
-  // 创建一个Date对象
-  const date = new Date(timestamp);
-  // 获取年、月、日、小时、分钟、秒
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  const hours = String(date.getHours()).padStart(2, '0');
-  const minutes = String(date.getMinutes()).padStart(2, '0');
-  const seconds = String(date.getSeconds()).padStart(2, '0');
-  // 格式化为字符串
-  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+  try {
+    // 检查输入值是否有效
+    if (!bigIntValue || bigIntValue === 0n) {
+      return '--';
+    }
+    
+    // 转换为毫秒级别的时间戳
+    const timestamp = Number(bigIntValue) * 1000;
+    
+    // 检查时间戳是否有效
+    if (isNaN(timestamp) || timestamp <= 0) {
+      return '--';
+    }
+    
+    // 创建一个Date对象
+    const date = new Date(timestamp);
+    
+    // 检查Date对象是否有效
+    if (isNaN(date.getTime())) {
+      return '--';
+    }
+    
+    // 获取年、月、日、小时、分钟、秒
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const seconds = String(date.getSeconds()).padStart(2, '0');
+    
+    // 再次检查所有值是否有效
+    if (isNaN(year) || isNaN(month) || isNaN(day) || isNaN(hours) || isNaN(minutes) || isNaN(seconds)) {
+      return '--';
+    }
+    
+    // 格式化为字符串
+    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+  } catch (error) {
+    console.warn('时间戳转换失败:', bigIntValue, error);
+    return '--';
+  }
 }
 // 根据点击的文件夹名字返回到指定路径
 const handleBackPath = (index) => {

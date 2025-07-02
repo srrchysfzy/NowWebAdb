@@ -9,6 +9,7 @@
     @pointercancel="handlePointerUp"
     @pointerleave="handlePointerLeave"
     @contextmenu="handleContextMenu"
+    @wheel="handleWheel"
   />
 </template>
 
@@ -20,7 +21,7 @@ defineProps({
   containerStyle: Object,
 });
 
-const emit = defineEmits(['pointerdown', 'pointermove', 'pointerup', 'pointercancel', 'pointerleave', 'contextmenu']);
+const emit = defineEmits(['pointerdown', 'pointermove', 'pointerup', 'pointercancel', 'pointerleave', 'contextmenu', 'wheel']);
 
 const renderContainer = ref();
 
@@ -29,6 +30,7 @@ const handlePointerMove = (event) => emit('pointermove', event);
 const handlePointerUp = (event) => emit('pointerup', event);
 const handlePointerLeave = (event) => emit('pointerleave', event);
 const handleContextMenu = (event) => emit('contextmenu', event);
+const handleWheel = (event) => emit('wheel', event);
 
 defineExpose({ renderContainer })
 </script>

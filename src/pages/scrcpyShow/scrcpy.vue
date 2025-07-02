@@ -13,6 +13,7 @@
               @pointercancel="handlePointerUp"
               @pointerleave="handlePointerLeave"
               @contextmenu="handleContextMenu"
+              @wheel="handleWheel"
           />
           <DeviceOperateButton :style="{width: calcWidthAndHeight[0] + 'px'}" :press-key="pressKey" class="mt-1"/>
         </div>
@@ -64,6 +65,7 @@ const {
   handlePointerUp,
   handlePointerLeave,
   handleContextMenu,
+  handleWheel,
   scrcpyStart,
   destroyClient
 } = useScrcpy();

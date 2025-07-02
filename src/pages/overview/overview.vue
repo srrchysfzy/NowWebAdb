@@ -50,7 +50,7 @@
             <span class="fw-bold mx-2" style="font-size: 13px">{{ deviceStorageUsed }}</span>
             <span class="fw-bold mx-2" style="font-size: 13px">{{ deviceStorageUsedRate }}</span>
           </div>
-          <el-progress :percentage="Number(deviceStorageUsedRate.split('%')[0])" class="mt-1" style="width: 280px">
+          <el-progress :percentage="deviceStorageUsedRate ? Number(deviceStorageUsedRate.split('%')[0]) : 0" class="mt-1" style="width: 280px">
             <span />
           </el-progress>
         </el-col>
@@ -153,21 +153,21 @@ const getDevice = async () => {
     deviceNowImg.value = canvas.toDataURL()
     const batteryRes = await batteryVoltage();
     deviceBatteryVoltage.value = batteryRes ? batteryRes.split(':')[1] : '--'
-    deviceWifi.value = await wifiInfo()
-    deviceIp.value = await getDeviceIp()
+    deviceWifi.value = await wifiInfo() || '--'
+    deviceIp.value = await getDeviceIp() || '--'
     const storageRes = await deviceDiskSpace()
     deviceStorageTotal.value = storageRes.total
     deviceStorageUsed.value = storageRes.used
     deviceStorageUsedRate.value = storageRes.usedRate
     const memoryRes = await deviceMemory()
     deviceMemoryTotal.value = memoryRes.total
-    deviceMemoryUsed.value = memoryRes.used.toFixed(2)
+    deviceMemoryUsed.value = typeof memoryRes.used === 'number' ? memoryRes.used.toFixed(2) : memoryRes.used
     deviceMemoryUsedRate.value = memoryRes.usedRate
-    deviceScreenSize.value = await getDeviceScreenSize()
-    deviceSerialno.value = await getDeviceSerialno()
-    deviceAbi.value = await getDeviceAbi()
-    deviceCpuCore.value = await getDeviceCpuCore()
-    deviceCpuBrand.value = await getDeviceCpuBrand()
+    deviceScreenSize.value = await getDeviceScreenSize() || '--'
+    deviceSerialno.value = await getDeviceSerialno() || '--'
+    deviceAbi.value = await getDeviceAbi() || '--'
+    deviceCpuCore.value = await getDeviceCpuCore() || '--'
+    deviceCpuBrand.value = await getDeviceCpuBrand() || '--'
   } catch (e) {
     console.log(e)
     ElNotification.error({
@@ -187,9 +187,9 @@ const batteryVoltage = async () => {
   if (res) {
     const voltageRegex = /voltage:\s*(\d+)/gm;
     const voltageMatch = res.match(voltageRegex);
-    return voltageMatch ? voltageMatch[1] : null
+    return voltageMatch ? `voltage:${voltageMatch[1]}` : null
   } else {
-    return '';
+    return null;
   }
 };
 const deviceDiskSpace = async () => {
@@ -198,12 +198,16 @@ const deviceDiskSpace = async () => {
     const storageRegex = /(\d+G) +(\d+G) +\d+G +(\d+%)/;
     const storageMatch = res.match(storageRegex);
     return {
-      total: storageMatch ? storageMatch[1] : null,
-      used: storageMatch ? storageMatch[2] : null,
-      usedRate: storageMatch ? storageMatch[3] : null,
+      total: storageMatch ? storageMatch[1] : '--',
+      used: storageMatch ? storageMatch[2] : '--',
+      usedRate: storageMatch ? storageMatch[3] : '0%',
     }
   } else {
-    return '';
+    return {
+      total: '--',
+      used: '--',
+      usedRate: '0%',
+    };
   }
 }
 const deviceMemory = async () => {
@@ -224,10 +228,18 @@ const deviceMemory = async () => {
         usedRate: memUsedRate,
       };
     } else {
-     return '';
+      return {
+        total: '--',
+        used: '--',
+        usedRate: '0',
+      };
    }
   } else {
-    return '';
+    return {
+      total: '--',
+      used: '--',
+      usedRate: '0',
+    };
   }
 }
 const wifiInfo = async () => {
@@ -286,8 +298,8 @@ const getDeviceCpuCore = async () => {
 }
 const getDeviceCpuBrand = async () => {
   const res = await executeCommand('grep \'^Hardware\' /proc/cpuinfo');
-  if (res) {
-    return res.split(':')[1]
+  if (res && res.includes(':')) {
+    return res.split(':')[1].trim()
   } else {
     return '';
   }

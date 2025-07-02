@@ -1,5 +1,3 @@
-import {AdbSubprocessNoneProtocol} from "@yume-chan/adb";
-
 let adbInstance
 
 export function setAdbInstance(instance) {
@@ -13,25 +11,27 @@ export function getAdbInstance() {
 // 执行shell命令
 export async function executeCommand(command) {
     if (!adbInstance) {
-        return;
+        return '';
     }
     try {
-        const process = await adbInstance.subprocess.spawn(command, {
-            protocols: [AdbSubprocessNoneProtocol],
-        });
+        // 优先使用 shell protocol，如果不支持则使用 none protocol
+        if (adbInstance.subprocess.shellProtocol?.isSupported) {
+            const result = await adbInstance.subprocess.shellProtocol.spawnWaitText(command);
+            return result.stdout;
+        } else {
+            // 使用 none protocol 作为备选
+            const process = await adbInstance.subprocess.noneProtocol.spawn(command);
+            const reader = process.stdout.getReader();
+            const chunks = [];
+            const decoder = new TextDecoder();
 
-        const reader = process.stdout.getReader();
-        const chunks = [];
-        let decoder = new TextDecoder();
-
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            chunks.push(decoder.decode(value, { stream: true }));
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                chunks.push(decoder.decode(value, { stream: true }));
+            }
+            return chunks.join('');
         }
-
-        await process.kill();
-        return chunks.join('');
     } catch (error) {
         console.error('执行命令出错:', error);
         return '';

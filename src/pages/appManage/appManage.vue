@@ -193,7 +193,14 @@ const testReadAppInfo = async () => {
   let adb = await getAdbInstance();
   let isServiceRunning = false
   console.log("检测服务是否开启")
-  const process = await adb.subprocess.spawn("top -b -n 1 | grep app_process");
+  
+  let process;
+  if (adb.subprocess.shellProtocol?.isSupported) {
+    process = await adb.subprocess.shellProtocol.spawn("top -b -n 1 | grep app_process");
+  } else {
+    process = await adb.subprocess.noneProtocol.spawn("top -b -n 1 | grep app_process");
+  }
+  
   await process.stdout.pipeThrough(new TextDecoderStream()).pipeTo(
       new WritableStream({
         write(chunk) {
@@ -208,12 +215,25 @@ const testReadAppInfo = async () => {
     console.log("服务未开启，尝试开启服务")
     console.log("准备推送apkans.jar")
     await pushServerAndStartScrcpyClient(adb, '/apkans.jar', false)
-    await adb.subprocess.spawn(
-        "CLASSPATH=/data/local/tmp/apkans.jar nohup app_process / com.lyx.myapplication.Main > /dev/null 2>&1 &"
-    );
-    // 检测服务是否开启
-    const process = await adb.subprocess.spawn("top -b -n 1 | grep app_process");
-    await process.stdout.pipeThrough(new TextDecoderStream()).pipeTo(
+    
+    if (adb.subprocess.shellProtocol?.isSupported) {
+      await adb.subprocess.shellProtocol.spawn(
+          "CLASSPATH=/data/local/tmp/apkans.jar nohup app_process / com.lyx.myapplication.Main > /dev/null 2>&1 &"
+      );
+    } else {
+      await adb.subprocess.noneProtocol.spawn(
+          "CLASSPATH=/data/local/tmp/apkans.jar nohup app_process / com.lyx.myapplication.Main > /dev/null 2>&1 &"
+      );
+    }
+    
+    let checkProcess;
+    if (adb.subprocess.shellProtocol?.isSupported) {
+      checkProcess = await adb.subprocess.shellProtocol.spawn("top -b -n 1 | grep app_process");
+    } else {
+      checkProcess = await adb.subprocess.noneProtocol.spawn("top -b -n 1 | grep app_process");
+    }
+    
+    await checkProcess.stdout.pipeThrough(new TextDecoderStream()).pipeTo(
         new WritableStream({
           write(chunk) {
             if (chunk.includes("com.lyx.myapplication.Main")) {

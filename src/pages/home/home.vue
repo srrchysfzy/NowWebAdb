@@ -60,9 +60,9 @@
 import computerImg from '@/assets/img/computer.png';
 import phoneImg from '@/assets/img/phone.png';
 import SvgIcon from '@/components/SvgIcon.vue';
-import {AdbDaemonWebUsbDeviceManager} from "@yume-chan/adb-daemon-webusb";
+import { AdbDaemonWebUsbDeviceManager } from "@yume-chan/adb-daemon-webusb";
 import AdbWebCredentialStore from "@yume-chan/adb-credential-web";
-import {AdbDaemonTransport, Adb} from "@yume-chan/adb";
+import { Adb, AdbDaemonTransport } from "@yume-chan/adb";
 import {setAdbInstance} from "@/utils/adbManager.js";
 
 const router = useRouter();
@@ -76,24 +76,37 @@ const connectDevice = async () => {
     changeColor()
   }, 100)
 
-  const Manager = AdbDaemonWebUsbDeviceManager.BROWSER;
   connectStatus.value = 'connectConfirming'
-  const device = await Manager.requestDevice()
+  const device = await AdbDaemonWebUsbDeviceManager.BROWSER?.requestDevice()
   connectStatus.value = 'connected'
   if (device) {
     devicesName.value = device.name
 
     try {
+      const credentialStore = new AdbWebCredentialStore();
+      
+      console.log('Connecting to device...');
       const connection = await device.connect();
-      const CredentialStore = new AdbWebCredentialStore();
+      
+      console.log('Connection created:', connection);
+      console.log('Device serial:', device.serial);
+      
+      // 使用 AdbDaemonTransport.authenticate 进行认证并创建完整的 transport
+      console.log('Authenticating with device...');
       const transport = await AdbDaemonTransport.authenticate({
         serial: device.serial,
-        connection,
-        credentialStore: CredentialStore,
+        connection: connection,
+        credentialStore: credentialStore,
       });
+      
+      console.log('Transport authenticated:', transport);
+      console.log('Transport banner:', transport.banner);
+      console.log('Transport clientFeatures:', transport.clientFeatures);
+      
       const adb = new Adb(transport);
-      console.log(adb)
-      setAdbInstance(adb)
+      console.log('Adb instance created successfully:', adb);
+      setAdbInstance(adb);
+      
       // 路由跳转
       await router.push({
         name: "Overview",
