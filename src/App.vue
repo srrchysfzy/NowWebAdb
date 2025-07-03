@@ -20,5 +20,9 @@ const showHeader = computed(() => {
 })
 </script>
 <style scoped>
-
+.app-main {
+  padding: 0;
+  height: calc(100vh - 60px);
+  width: 100%;
+}
 </style>

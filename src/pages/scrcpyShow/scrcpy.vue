@@ -84,9 +84,34 @@ onMounted(() => {
   scrcpyStart(renderRef.value);
 });
 
-onBeforeUnmount(() => {
+onBeforeUnmount(async () => {
   console.log("销毁 scrcpy");
-  destroyClient()
+  try {
+    // 移除所有事件监听器
+    window.removeEventListener('keydown', handleKeyEvent);
+    window.removeEventListener('keyup', handleKeyEvent);
+    
+    // 等待一小段时间，确保所有事件处理完成
+    await new Promise(resolve => setTimeout(resolve, 50));
+    
+    // 调用销毁函数
+    await destroyClient();
+    console.log("scrcpy 资源已清理完成");
+  } catch (error) {
+    console.error("销毁 scrcpy 资源时出错:", error);
+    // 即使出错，也确保设置为 null 以便垃圾回收
+    try {
+      // 强制清理资源的最后尝试
+      if (renderRef.value && renderRef.value.renderContainer) {
+        const container = renderRef.value.renderContainer;
+        while (container.firstChild) {
+          container.removeChild(container.firstChild);
+        }
+      }
+    } catch (e) {
+      console.warn("清理渲染容器时出错:", e);
+    }
+  }
 });
 </script>
 

@@ -30,6 +30,7 @@ NowWebAdb is a web-based Android device management tool implemented using the op
 
 - **Terminal Operations** 💻
     - Directly send Shell commands for terminal operations.
+    - Optimized terminal display for better user experience.
 
 - **Screen Control** 🖱️
     - Supports direct control of device screen operations from the web interface, including:
@@ -37,9 +38,22 @@ NowWebAdb is a web-based Android device management tool implemented using the op
         - Mouse wheel operations
         - Keyboard input
 
+- **Performance Monitoring** 📈
+    - Real-time monitoring of device performance metrics:
+        - CPU usage
+        - Memory consumption
+        - FPS (Frames Per Second)
+        - Network traffic
+        - Battery level and temperature
+    - Customizable data collection intervals and limits
+    - Export performance data reports
+
+- **Real-time Logcat** 📋
+    - View and filter device logs in real-time
+    - Enhanced log display with color-coding and filtering options
+
 - **Future Features** 🛠️
     - Application management
-    - Real-time log viewing
     - Screenshot functionality, etc.
 
 ## 🛠️ Technology Stack
@@ -69,6 +83,8 @@ NowWebAdb
 │   ├── pages             # Pages
 │   ├── router            # Routing
 │   ├── stores            # State management
+│   ├── utils             # Utility functions
+│   │   ├── performance   # Performance monitoring utilities
 │   ├── App.vue           # Root component
 │   ├── auto-imports.d.ts # Vite auto-import types
 │   ├── main.js           # Entry file

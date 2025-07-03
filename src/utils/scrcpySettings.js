@@ -1,5 +1,6 @@
 export const DEFAULT_SETTINGS = {
     maxSize: 1080,
+    maxFps: 60,
     videoBitRate: 8000000,
     videoCodec: "h264",
     displayId: 0,

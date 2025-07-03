@@ -1,8 +1,7 @@
 import { ref, computed } from 'vue';
 import { InspectStream, ReadableStream } from '@yume-chan/stream-extra';
 import { getAdbInstance } from '@/utils/adbManager.js';
-import { VERSION } from '@yume-chan/fetch-scrcpy-server';
-import { AdbScrcpyClient, AdbScrcpyOptions3_2 } from '@yume-chan/adb-scrcpy';
+import { AdbScrcpyClient, AdbScrcpyOptionsLatest } from '@yume-chan/adb-scrcpy';
 import {
     ScrcpyVideoCodecId,
     h264ParseConfiguration,
@@ -143,7 +142,7 @@ const useScrcpy = () => {
             // 首先获取设备真实分辨率
             await getDeviceRealResolution(adb);
             
-            options = new AdbScrcpyOptions3_2({
+            options = new AdbScrcpyOptionsLatest({
                 ...DEFAULT_SETTINGS,
                 scid: ScrcpyInstanceId.random(),
             });
@@ -218,7 +217,11 @@ const useScrcpy = () => {
             // 设置解码器，使用实际的 codec
             decoder = new WebCodecsVideoDecoder({
                 codec: metadata.codec,
-                renderer: renderer
+                renderer: renderer,
+                // 添加错误处理回调
+                onError: (error) => {
+                    console.warn('解码器错误:', error);
+                }
             });
 
             // 检查并附加渲染器
@@ -232,13 +235,28 @@ const useScrcpy = () => {
             lastKeyframe.value = 0n;
 
             // 处理视频包
-            const handler = new InspectStream((packet) => handlePacket(packet, metadata));
-
-            // 事件已通过 Vue 模板绑定，无需重复绑定
+            const handler = new InspectStream((packet) => {
+                try {
+                    handlePacket(packet, metadata);
+                } catch (error) {
+                    console.warn('处理视频包时出错:', error);
+                }
+            });
 
             // 连接视频流
             if (videoPacketStream && typeof videoPacketStream.pipeTo === 'function') {
-                videoPacketStream.pipeThrough(handler).pipeTo(decoder.writable);
+                // 添加错误处理
+                videoPacketStream
+                    .pipeThrough(handler)
+                    .pipeTo(decoder.writable)
+                    .catch(error => {
+                        // 忽略组件卸载时的常见错误
+                        if (error.name !== 'AbortError' && 
+                            !error.message.includes('locked') && 
+                            !error.message.includes('closed')) {
+                            console.error('视频流处理错误:', error);
+                        }
+                    });
             } else {
                 console.error('videoPacketStream 无效或不可用');
             }
@@ -624,17 +642,57 @@ const useScrcpy = () => {
             container.removeEventListener("pointerleave", handlePointerLeave);
         }
 
+        // 先关闭客户端连接，这将停止新数据的产生
         if (client) {
-            await client.close();
+            try {
+                await client.close();
+                client = null;
+            } catch (e) {
+                console.warn('关闭客户端时出错:', e);
+            }
         }
 
-        if (decoder) {
-            if (decoder.renderer && decoder.renderer.canvas && container) {
-                container.removeChild(decoder.renderer.canvas);
+        // 等待一小段时间，让流处理完当前数据
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        // 处理视频流
+        if (videoStream) {
+            try {
+                // 不尝试取消可能已锁定的流
+                videoStream = null;
+            } catch (e) {
+                console.warn('处理视频流时出错:', e);
             }
-            decoder.dispose();
-            decoder = null;
         }
+
+        // 关闭解码器
+        if (decoder) {
+            try {
+                // 不尝试中止可能已锁定的流
+                
+                // 如果有渲染器，从容器中移除
+                if (decoder.renderer && decoder.renderer.canvas && container) {
+                    try {
+                        container.removeChild(decoder.renderer.canvas);
+                    } catch (e) {
+                        console.warn('移除渲染器时出错:', e);
+                    }
+                }
+                
+                // 最后处理解码器
+                try {
+                    decoder.dispose();
+                } catch (e) {
+                    console.warn('销毁解码器时出错:', e);
+                }
+                decoder = null;
+            } catch (e) {
+                console.warn('关闭解码器时出错:', e);
+            }
+        }
+        
+        // 清理其他资源
+        videoStream = null;
     }
 
     return {

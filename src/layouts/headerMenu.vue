@@ -26,6 +26,9 @@
     <el-menu-item index="screenControl">
       <span class="fw-bold fs-6">屏幕操作</span>
     </el-menu-item>
+    <el-menu-item index="performance">
+      <span class="fw-bold fs-6">性能监控</span>
+    </el-menu-item>
     <div class="flex-grow"/>
     <el-space class="mx-2" style="font-size: 14px;">
       <TemperatureIcon style="margin-right: 10px" :temperature="temperature"/>
