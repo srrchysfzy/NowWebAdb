@@ -93,7 +93,7 @@ import { FitAddon } from 'xterm-addon-fit'
 import 'xterm/css/xterm.css'
 import { encodeUtf8 } from '@yume-chan/adb'
 import { TextDecoderStream, WritableStream } from '@yume-chan/stream-extra'
-import { getAdbInstance } from '../../utils/adbManager'
+import { getAdbInstance } from '@/utils/adbManager.js'
 
 // 响应式数据
 const terminalContainer = ref(null)
@@ -442,7 +442,7 @@ const cleanup = async () => {
 <style scoped>
 .terminal-page {
   padding: 20px;
-  height: 88vh;
+  height: 93vh;
   display: flex;
   flex-direction: column;
 }

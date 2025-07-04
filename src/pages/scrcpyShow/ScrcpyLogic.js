@@ -38,6 +38,9 @@ const useScrcpy = () => {
     const openInput = ref(false)
     const adbInstance = computed(() => getAdbInstance());
     const lastKeyframe = ref(0n);
+    // 增加连接状态
+    const connectionStatus = ref('idle'); // idle, connecting, connected, error
+    const connectionError = ref('');
     // 旋转角度常量
     const ROTATION_90 = 1;
     const ROTATION_180 = 2;
@@ -93,15 +96,23 @@ const useScrcpy = () => {
      */
     const scrcpyStart = async (renderRef) => {
         try {
-            // console.log('Scrcpy 版本:', VERSION);
+            connectionStatus.value = 'connecting';
+            connectionError.value = '';
             renderContainer.value = renderRef.renderContainer;
             const adb = adbInstance.value;
+            
+            if (!adb) {
+                throw new Error('ADB 实例未初始化');
+            }
+            
             await pushServerAndStartScrcpyClient(adb, '/server.bin');
             console.log('服务端已推送');
 
             await startScrcpyClient(adb);
         } catch (error) {
             console.error('初始化 scrcpy 时出错:', error);
+            connectionStatus.value = 'error';
+            connectionError.value = `连接错误: ${error.message || '未知错误'}`;
         }
     };
 
@@ -155,7 +166,11 @@ const useScrcpy = () => {
                 write: (line) => {
                     console.log('scrcpy server:', line);
                 },
-            })).catch(e => console.error('output stream error:', e));
+            })).catch(e => {
+                console.error('output stream error:', e);
+                connectionStatus.value = 'error';
+                connectionError.value = `输出流错误: ${e.message || '未知错误'}`;
+            });
 
             // 获取视频流
             videoStream = await client.videoStream;
@@ -163,16 +178,23 @@ const useScrcpy = () => {
             if (videoStream) {
                 initializeVideoStream(videoStream);
                 console.log('视频流已启动');
+                connectionStatus.value = 'connected';
+            } else {
+                throw new Error('无法获取视频流');
             }
 
-                        // 检查控制器状态
+            // 检查控制器状态
             if (client.controller) {
                 console.log('控制器已初始化，可以进行触控操作');
             } else {
                 console.error('控制器未初始化，无法进行触控操作');
+                // 这不是致命错误，所以不改变连接状态
             }
         } catch (error) {
             console.error('启动 scrcpy 客户端时出错:', error);
+            connectionStatus.value = 'error';
+            connectionError.value = `客户端错误: ${error.message || '未知错误'}`;
+            throw error;
         }
     };
 
@@ -604,24 +626,45 @@ const useScrcpy = () => {
      * @param {KeyboardEvent} e 键盘事件
      * @param code 屏幕物理按键专用
      */
-    const handleKeyCode = async (e, code=null) => {
-        if (code) {
-            await client.controller.injectKeyCode({
-                action: e.type === 'mousedown' ? AndroidKeyEventAction.Down : AndroidKeyEventAction.Up,
-                keyCode: code,
-                repeat: 0,
-                metaState: AndroidKeyEventMeta.NumLockOn,
-            });
+    const handleKeyCode = async (e, code = null) => {
+        let action;
+        let keyRepeat = false;
+        if (e) {
+            // For physical keyboard events
+            action = e.type === 'keydown' ? AndroidKeyEventAction.Down : AndroidKeyEventAction.Up;
+            keyRepeat = e.repeat;
         } else {
-            const keyCode = AndroidKeyCode[e.code];
-            if (keyCode) {
-                await client.controller.injectKeyCode({
-                    action: e.type === 'keydown' ? AndroidKeyEventAction.Down : AndroidKeyEventAction.Up,
-                    keyCode,
-                    repeat: 0,
-                    metaState: AndroidKeyEventMeta.NumLockOn,
-                });
-            }
+            // For virtual button clicks, we simulate a full press (Down and Up)
+            action = AndroidKeyEventAction.Down;
+        }
+
+        // If 'code' is provided (from a virtual button), use it.
+        // Otherwise, get the code from the physical keyboard event.
+        const finalKeyCode = code || AndroidKeyCode[e.code];
+        if (!finalKeyCode) {
+            return;
+        }
+
+        if (e && e.defaultPrevented) {
+            return;
+        }
+
+        // Send the key-down event
+        await client.controller?.injectKeyCode({
+            action,
+            keyCode: finalKeyCode,
+            repeat: keyRepeat ? 1 : 0,
+            metaState: 0,
+        });
+
+        // If it was a virtual click (no 'e'), send the key-up event immediately
+        if (!e) {
+            await client.controller?.injectKeyCode({
+                action: AndroidKeyEventAction.Up,
+                keyCode: finalKeyCode,
+                repeat: 0,
+                metaState: 0,
+            });
         }
     };
 
@@ -630,70 +673,52 @@ const useScrcpy = () => {
      * @returns {Promise<void>}
      */
     const destroyClient = async () => {
-        const container = renderContainer.value;
-        if (container) {
-            container.removeEventListener("wheel", handleWheel);
-            container.removeEventListener("contextmenu", handleContextMenu);
-            container.removeEventListener("keydown", handleKeyCode);
-            container.removeEventListener("keyup", handleKeyCode);
-            container.removeEventListener("pointerdown", handlePointerDown);
-            container.removeEventListener("pointermove", handlePointerMove);
-            container.removeEventListener("pointerup", handlePointerUp);
-            container.removeEventListener("pointerleave", handlePointerLeave);
-        }
-
-        // 先关闭客户端连接，这将停止新数据的产生
-        if (client) {
-            try {
-                await client.close();
-                client = null;
-            } catch (e) {
-                console.warn('关闭客户端时出错:', e);
-            }
-        }
-
-        // 等待一小段时间，让流处理完当前数据
-        await new Promise(resolve => setTimeout(resolve, 100));
-
-        // 处理视频流
-        if (videoStream) {
-            try {
-                // 不尝试取消可能已锁定的流
-                videoStream = null;
-            } catch (e) {
-                console.warn('处理视频流时出错:', e);
-            }
-        }
-
-        // 关闭解码器
-        if (decoder) {
-            try {
-                // 不尝试中止可能已锁定的流
-                
-                // 如果有渲染器，从容器中移除
-                if (decoder.renderer && decoder.renderer.canvas && container) {
-                    try {
-                        container.removeChild(decoder.renderer.canvas);
-                    } catch (e) {
-                        console.warn('移除渲染器时出错:', e);
-                    }
-                }
-                
-                // 最后处理解码器
+        try {
+            console.log("销毁 scrcpy 客户端资源开始");
+            
+            // 重置连接状态
+            connectionStatus.value = 'idle';
+            connectionError.value = '';
+            
+            // 销毁解码器
+            if (decoder) {
                 try {
-                    decoder.dispose();
+                    await decoder.dispose();
+                    decoder = null;
                 } catch (e) {
-                    console.warn('销毁解码器时出错:', e);
+                    console.warn("解码器销毁出错:", e);
                 }
-                decoder = null;
-            } catch (e) {
-                console.warn('关闭解码器时出错:', e);
             }
+            
+            // 销毁客户端
+            if (client) {
+                try {
+                    await client.dispose();
+                    client = null;
+                } catch (e) {
+                    console.warn("客户端销毁出错:", e);
+                }
+            }
+            
+            // 清理DOM元素
+            if (renderContainer.value) {
+                while (renderContainer.value.firstChild) {
+                    renderContainer.value.removeChild(renderContainer.value.firstChild);
+                }
+            }
+            
+            // 重置所有状态变量
+            width.value = 0;
+            height.value = 0;
+            deviceRealWidth = 0;
+            deviceRealHeight = 0;
+            videoStream = null;
+            
+            console.log("销毁 scrcpy 客户端资源完成");
+        } catch (e) {
+            console.error("销毁 scrcpy 客户端资源时出错:", e);
         }
-        
-        // 清理其他资源
-        videoStream = null;
-    }
+    };
 
     return {
         decoder,
@@ -719,6 +744,9 @@ const useScrcpy = () => {
         handleWheel,
         scrcpyStart,
         destroyClient,
+        // 新增状态
+        connectionStatus,
+        connectionError
     };
 };
 

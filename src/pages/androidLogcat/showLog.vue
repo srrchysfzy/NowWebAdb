@@ -65,7 +65,7 @@
         <div class="log-cell tag">标签</div>
         <div class="log-cell message">消息</div>
       </div>
-      <el-scrollbar ref="scrollbarRef" height="calc(100vh - 300px)" @scroll="handleScroll">
+      <el-scrollbar ref="scrollbarRef" height="calc(100vh - 240px)" @scroll="handleScroll">
         <div v-if="filteredLogs.length > 0" class="log-entries">
           <div class="virtual-padding-top" :style="{ height: `${topPadding}px` }"></div>
           <div

@@ -109,7 +109,7 @@ const connectDevice = async () => {
       
       // 路由跳转
       await router.push({
-        name: "Overview",
+        path: "/dashboard",
       });
     } catch (e) {
       console.log(e)

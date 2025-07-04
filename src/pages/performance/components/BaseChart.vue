@@ -77,6 +77,11 @@ const props = defineProps({
   isStack: {
     type: Boolean,
     default: false
+  },
+  // 自定义内边距
+  customPadding: {
+    type: Object,
+    default: () => ({ left: 40, right: 20, top: 30, bottom: 50 })
   }
 });
 
@@ -103,10 +108,10 @@ const initChart = () => {
       container: chartContainer.value,
       autoFit: true,
       height: typeof props.height === 'number' ? props.height : parseInt(props.height, 10) || 300,
-      paddingLeft: 40,
-      paddingRight: 20,
-      paddingTop: 30,
-      paddingBottom: 50,
+      paddingLeft: props.customPadding.left,
+      paddingRight: props.customPadding.right,
+      paddingTop: props.customPadding.top,
+      paddingBottom: props.customPadding.bottom,
     });
     
     // 构建图表配置
@@ -153,6 +158,15 @@ const initChart = () => {
               ? '暂无数据'
               : props.yAxisLabelFormatter(item.value);
             return { ...item, value };
+          },
+          domStyles: {
+            'g2-tooltip': {
+              backgroundColor: 'rgba(255, 255, 255, 0.95)',
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
+              borderRadius: '4px',
+              padding: '8px 12px',
+              zIndex: 100
+            }
           }
         }
       },
@@ -231,7 +245,8 @@ watch(
     props.min,
     props.max,
     props.colors,
-    props.height
+    props.height,
+    props.customPadding
   ],
   () => {
     // 配置变化时，需要重新创建图表

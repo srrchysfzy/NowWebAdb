@@ -1,50 +1,78 @@
 <template>
-  <el-button-group class="pressKey">
-    <el-tooltip effect="light" content="菜单" placement="bottom">
-      <el-button style="width: 25%" type="info" @mousedown="(e) => pressKey(e, 'ContextMenu')" @mouseup="(e) => pressKey(e, 'ContextMenu')">
-        <el-icon :size="13" style="vertical-align: middle">
-          <Menu />
-        </el-icon>
-      </el-button>
-    </el-tooltip>
-    <el-tooltip effect="light" content="任务" placement="bottom">
-      <el-button style="width: 25%" type="info" @mousedown="(e) => pressKey(e, 'AndroidAppSwitch')" @mouseup="(e) => pressKey(e, 'AndroidAppSwitch')">
-        <el-icon :size="13" style="vertical-align: middle">
-          <CopyDocument />
-        </el-icon>
-      </el-button>
-    </el-tooltip>
-    <el-tooltip effect="light" content="主页" placement="bottom">
-      <el-button style="width: 25%" type="info" @mousedown="(e) => pressKey(e, 'AndroidHome')" @mouseup="(e) => pressKey(e, 'AndroidHome')">
-        <el-icon :size="13" style="vertical-align: middle">
-          <House />
-        </el-icon>
-      </el-button>
-    </el-tooltip>
-    <el-tooltip effect="light" content="返回" placement="bottom">
-      <el-button style="width: 25%" type="info" @mousedown="(e) => pressKey(e, 'AndroidBack')" @mouseup="(e) => pressKey(e, 'AndroidBack')">
-        <el-icon :size="13" style="vertical-align: middle">
-          <Back />
-        </el-icon>
-      </el-button>
-    </el-tooltip>
-  </el-button-group>
+  <div class="device-control-bar">
+    <el-space wrap>
+      <el-tooltip effect="dark" content="返回" placement="top">
+        <el-button @click="handlePress('AndroidBack')">
+          <el-icon :size="16"><Back /></el-icon>
+        </el-button>
+      </el-tooltip>
+      <el-tooltip effect="dark" content="主页" placement="top">
+        <el-button @click="handlePress('AndroidHome')">
+          <el-icon :size="16"><House /></el-icon>
+        </el-button>
+      </el-tooltip>
+      <el-tooltip effect="dark" content="多任务" placement="top">
+        <el-button @click="handlePress('AndroidAppSwitch')">
+          <el-icon :size="16"><CopyDocument /></el-icon>
+        </el-button>
+      </el-tooltip>
+      <el-tooltip effect="dark" content="菜单" placement="top">
+        <el-button @click="handlePress('ContextMenu')">
+          <el-icon :size="16"><Menu /></el-icon>
+        </el-button>
+      </el-tooltip>
+      <el-divider direction="vertical" />
+      <el-tooltip effect="dark" content="音量-" placement="top">
+        <el-button @click="handlePress('VolumeDown')">
+          <el-icon :size="16"><Minus /></el-icon>
+        </el-button>
+      </el-tooltip>
+      <el-tooltip effect="dark" content="音量+" placement="top">
+        <el-button @click="handlePress('VolumeUp')">
+          <el-icon :size="16"><Plus /></el-icon>
+        </el-button>
+      </el-tooltip>
+      <el-tooltip effect="dark" content="电源" placement="top">
+        <el-button @click="handlePress('Power')">
+          <el-icon :size="16"><SwitchButton /></el-icon>
+        </el-button>
+      </el-tooltip>
+    </el-space>
+  </div>
 </template>
 
 <script setup>
-import {Back, CopyDocument, House, Menu} from "@element-plus/icons-vue";
+import { 
+  Menu, CopyDocument, House, Back, Plus, Minus, SwitchButton
+} from "@element-plus/icons-vue";
 
-defineProps({
+const props = defineProps({
   pressKey: Function,
-})
+});
 
+const handlePress = (key) => {
+  if (props.pressKey) {
+    props.pressKey(null, key);
+  }
+};
 </script>
 
-<style scoped lang="scss">
-.pressKey {
-  padding: 5px;
-  width: 100%;
-  margin-top: 1px;
-  margin-left: 2px;
+<style scoped>
+.device-control-bar {
+  margin-top: 10px;
+  padding: 8px;
+  background-color: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.el-divider--vertical {
+  height: 1.5em;
+  margin: 0 8px;
+}
+.el-button {
+  border: none;
 }
 </style>

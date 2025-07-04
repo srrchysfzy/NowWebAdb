@@ -15,19 +15,19 @@
 
 
     <el-space class="mt-4" :size="40">
-      <el-space style="cursor: pointer" @click="createNewFolder">
+      <el-space style="cursor: pointer" @click="uninstallApp">
         <SvgIcon icon="packageDelete"/>
         <span>卸载</span>
       </el-space>
-      <el-space style="cursor: pointer" @click="createNewFolder">
+      <el-space style="cursor: pointer" @click="backupApp">
         <SvgIcon icon="packageSave"/>
         <span>备份</span>
       </el-space>
-      <el-space style="cursor: pointer" @click="createNewFolder">
+      <el-space style="cursor: pointer" @click="exportApk">
         <SvgIcon icon="packageExport"/>
         <span>导出Apk</span>
       </el-space>
-      <el-space style="cursor: pointer" @click="createNewFolder">
+      <el-space style="cursor: pointer" @click="showAppDetails">
         <SvgIcon icon="packageInfo"/>
         <span>详细信息</span>
       </el-space>
@@ -187,6 +187,23 @@ const handleSelectAll = () => {
       appItem.isSelect = false
     })
   }
+}
+
+// 应用操作功能
+const uninstallApp = () => {
+  ElMessage.info('卸载功能开发中')
+}
+
+const backupApp = () => {
+  ElMessage.info('备份功能开发中')
+}
+
+const exportApk = () => {
+  ElMessage.info('导出APK功能开发中')
+}
+
+const showAppDetails = () => {
+  ElMessage.info('查看应用详情功能开发中')
 }
 
 const testReadAppInfo = async () => {
