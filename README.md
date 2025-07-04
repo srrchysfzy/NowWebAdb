@@ -3,6 +3,23 @@
 
 NowWebAdb is a web-based Android device management tool implemented using the open-source library [ya-webadb](https://github.com/yume-chan/ya-webadb). It allows users to manage and interact with local Android devices through a web interface, providing various features for device information retrieval and management.
 
+## 🔥 Latest Updates
+
+- **Comprehensive UI Redesign** 🎨
+  - New split-screen layout with device screen on the left and features on the right
+  - Tab-based navigation for seamless switching between functions
+  - Enhanced device status bar with real-time information
+
+- **Improved Device Dashboard** 📊
+  - Detailed device information cards for system, hardware, battery, storage, and network
+  - Real-time performance charts for CPU and memory monitoring
+  - Enhanced error handling and connection state management
+
+- **Enhanced Screen Mirroring** 📱
+  - Improved connection stability and error recovery
+  - Redesigned device control buttons for better usability
+  - Loading screen with status indicators during connection
+
 ## 🌟 Feature Overview
 
 - **Device Information Retrieval** 📊
@@ -79,6 +96,7 @@ NowWebAdb
 ├── src
 │   ├── assets            # Static resource
 │   ├── components        # Common components
+│   │   ├── overview      # Device overview components
 │   ├── layouts           # Layouts
 │   ├── pages             # Pages
 │   ├── router            # Routing
