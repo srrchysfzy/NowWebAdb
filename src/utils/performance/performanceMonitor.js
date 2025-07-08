@@ -2,10 +2,10 @@
 // 该文件负责启动、停止和管理数据采集的定时任务
 
 import { executeCommand } from '../adbManager';
-import { usePerformanceStore } from '../../stores/performance';
+import { usePerformanceStore } from '@/stores/performance.js';
 
 // 导入所有采集器
-import { collectCpuUsage } from './collectors/cpuCollector';
+import { collectCpuUsage, resetCpuCollector } from './collectors/cpuCollector';
 import { collectMemoryUsage, collectDetailedMemoryUsage } from './collectors/memoryCollector';
 import { collectBatteryInfo, resetBatteryCollector } from './collectors/batteryCollector';
 import { collectNetworkUsage, resetNetworkCollector } from './collectors/networkCollector';
@@ -92,6 +92,7 @@ class PerformanceMonitor {
    */
   resetCollectors() {
     console.log('重置所有采集器状态');
+    resetCpuCollector();
     resetNetworkCollector();
     resetFpsCollector();
     resetBatteryCollector();

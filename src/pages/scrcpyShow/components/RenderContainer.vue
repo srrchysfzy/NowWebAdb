@@ -34,3 +34,11 @@ const handleWheel = (event) => emit('wheel', event);
 
 defineExpose({ renderContainer })
 </script>
+
+<style scoped>
+:fullscreen div {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+</style>

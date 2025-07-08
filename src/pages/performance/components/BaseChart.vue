@@ -267,10 +267,34 @@ onMounted(() => {
     const handleResize = () => {
       if (chart.value) {
         try {
-          chart.value.resize();
+          // 对于新版G2，图表默认开启autoFit，只需要重新渲染即可
+          // 延迟执行以确保容器尺寸已更新
+          setTimeout(() => {
+            if (chart.value && typeof chart.value.render === 'function') {
+              chart.value.render();
+            } else {
+              // 如果图表实例无效，重新初始化
+              console.warn('图表实例无效，重新初始化图表');
+              nextTick(initChart);
+            }
+          }, 100);
         } catch (error) {
           console.error('调整图表大小时出错:', error);
+          // 如果resize失败，尝试重新初始化图表
+          try {
+            setTimeout(() => {
+              nextTick(initChart);
+            }, 100);
+          } catch (initError) {
+            console.error('重新初始化图表失败:', initError);
+          }
         }
+      } else {
+        // 如果图表实例不存在，尝试重新初始化
+        console.warn('图表实例不存在，尝试重新初始化');
+        setTimeout(() => {
+          nextTick(initChart);
+        }, 100);
       }
     };
     
@@ -315,10 +339,31 @@ defineExpose({
   resize: () => {
     if (chart.value) {
       try {
-        chart.value.resize();
+        // 对于新版G2，图表默认开启autoFit，只需要重新渲染即可
+        setTimeout(() => {
+          if (chart.value && typeof chart.value.render === 'function') {
+            chart.value.render();
+          } else {
+            console.warn('图表实例无效，重新初始化图表');
+            nextTick(initChart);
+          }
+        }, 100);
       } catch (error) {
         console.error('调整图表大小时出错:', error);
+        // 如果resize失败，尝试重新初始化图表
+        try {
+          setTimeout(() => {
+            nextTick(initChart);
+          }, 100);
+        } catch (initError) {
+          console.error('重新初始化图表失败:', initError);
+        }
       }
+    } else {
+      console.warn('图表实例不存在，尝试重新初始化');
+      setTimeout(() => {
+        nextTick(initChart);
+      }, 100);
     }
   }
 });

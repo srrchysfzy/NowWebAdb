@@ -3,7 +3,15 @@
  * 参考solox的逻辑，通过读取/proc/stat和/proc/<pid>/stat文件计算CPU使用率
  */
 
-import { executeCommand } from '../../adbManager';
+import {executeCommand} from '../../adbManager';
+
+// 用于存储上一次的CPU统计数据
+let previousCpuStats = {
+  processCpuTime: 0,
+  totalCpuTime: 0,
+  idleCpuTime: 0,
+  timestamp: 0,
+};
 
 /**
  * 获取进程的CPU统计数据
@@ -30,9 +38,8 @@ async function getProcessCpuStat(pid) {
     }
     
     // 计算进程总CPU时间 (utime + stime + cutime + cstime)
-    const processCpuTime = parseFloat(tokens[13]) + parseFloat(tokens[14]) + 
-                          parseFloat(tokens[15]) + parseFloat(tokens[16]);
-    return processCpuTime;
+    return parseFloat(tokens[13]) + parseFloat(tokens[14]) +
+        parseFloat(tokens[15]) + parseFloat(tokens[16]);
   } catch (error) {
     console.error('获取进程CPU统计数据时出错:', error);
     return 0;
@@ -97,12 +104,28 @@ async function getIdleCpuStat() {
       return 0;
     }
     
-    return parseFloat(tokens[4]); // idle time
+    // idle time is the 4th value
+    return parseFloat(tokens[4]);
   } catch (error) {
-    console.error('获取系统空闲CPU统计数据时出错:', error);
+    console.error('获取空闲CPU统计数据时出错:', error);
     return 0;
   }
 }
+
+
+/**
+ * 重置CPU采集器状态
+ */
+export function resetCpuCollector() {
+  console.log('重置CPU采集器状态');
+  previousCpuStats = {
+    processCpuTime: 0,
+    totalCpuTime: 0,
+    idleCpuTime: 0,
+    timestamp: 0,
+  };
+}
+
 
 /**
  * 采集CPU使用率
@@ -116,40 +139,44 @@ export async function collectCpuUsage(pid) {
       return { appCpu: 0, systemCpu: 0 };
     }
 
-    // 第一次采样
-    const processCpuTime1 = await getProcessCpuStat(pid);
-    const totalCpuTime1 = await getTotalCpuStat();
-    const idleCpuTime1 = await getIdleCpuStat();
-
-    // 等待一段时间
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    // 同时获取当前的所有CPU统计数据
+    const [processCpuTime, totalCpuTime, idleCpuTime] = await Promise.all([
+      getProcessCpuStat(pid),
+      getTotalCpuStat(),
+      getIdleCpuStat()
+    ]);
     
-    // 第二次采样
-    const processCpuTime2 = await getProcessCpuStat(pid);
-    const totalCpuTime2 = await getTotalCpuStat();
-    const idleCpuTime2 = await getIdleCpuStat();
+    const now = Date.now();
+
+    // 如果是首次采集，仅记录数据，不计算
+    if (previousCpuStats.timestamp === 0) {
+      previousCpuStats = { processCpuTime, totalCpuTime, idleCpuTime, timestamp: now };
+      return { appCpu: 0, systemCpu: 0 };
+    }
 
     // 计算时间差
-    const processCpuTimeDiff = processCpuTime2 - processCpuTime1;
-    const totalCpuTimeDiff = totalCpuTime2 - totalCpuTime1;
+    const processCpuTimeDiff = processCpuTime - previousCpuStats.processCpuTime;
+    const totalCpuTimeDiff = totalCpuTime - previousCpuStats.totalCpuTime;
+    const idleCpuTimeDiff = idleCpuTime - previousCpuStats.idleCpuTime;
+    
+    // 更新上一次的统计数据
+    previousCpuStats = { processCpuTime, totalCpuTime, idleCpuTime, timestamp: now };
 
     // 避免除以零
     if (totalCpuTimeDiff <= 0) {
-      console.warn('CPU时间差异为零，无法计算使用率');
+      // console.warn('CPU时间差异为零或负数，无法计算使用率');
       return { appCpu: 0, systemCpu: 0 };
     }
     
     // 计算应用CPU使用率
     const appCpuUsage = (processCpuTimeDiff / totalCpuTimeDiff) * 100;
     
-    // 计算系统CPU使用率
-    const totalActiveTime1 = totalCpuTime1 - idleCpuTime1;
-    const totalActiveTime2 = totalCpuTime2 - idleCpuTime2;
-    const systemCpuUsage = ((totalActiveTime2 - totalActiveTime1) / totalCpuTimeDiff) * 100;
+    // 计算系统CPU使用率 ( (总CPU时间 - 空闲CPU时间) / 总CPU时间 )
+    const systemCpuUsage = ((totalCpuTimeDiff - idleCpuTimeDiff) / totalCpuTimeDiff) * 100;
     
     // 四舍五入到两位小数
-    const appCpu = Math.round(appCpuUsage * 100) / 100;
-    const systemCpu = Math.round(systemCpuUsage * 100) / 100;
+    const appCpu = Math.max(0, Math.min(100, parseFloat(appCpuUsage.toFixed(2))));
+    const systemCpu = Math.max(0, Math.min(100, parseFloat(systemCpuUsage.toFixed(2))));
 
     return { appCpu, systemCpu };
   } catch (error) {

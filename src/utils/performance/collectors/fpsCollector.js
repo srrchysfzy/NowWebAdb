@@ -431,113 +431,47 @@ export async function collectFps(packageName) {
       return { fps: 0, jank: 0 };
     }
     
-    const currentTime = Date.now();
-    let fps = 0;
-    let jank = 0;
-    
-    // 尝试使用SurfaceFlinger方法
-    try {
-      // 获取焦点窗口
-      const windowName = await getFocusWindow(packageName);
-      
-      if (windowName) {
-        // 清除上一次的延迟数据
-        const cleared = await clearSurfaceFlingerLatencyData(windowName);
-        
-        if (cleared) {
-          // 等待一小段时间以收集新的帧数据
-          await new Promise(resolve => setTimeout(resolve, 100));
-          
-          // 获取帧数据
-          const { refreshPeriod, timestamps } = await getSurfaceFlingerFrameData(windowName, true);
-          
-          if (refreshPeriod && timestamps && timestamps.length > 0) {
-            // 过滤时间戳，只保留比上次时间戳更新的
-            let filteredTimestamps = timestamps;
-            if (previousFrameData.lastTimestamp > 0) {
-              filteredTimestamps = timestamps.filter(timestamp => timestamp[1] > previousFrameData.lastTimestamp);
-              
-              if (filteredTimestamps.length > 0) {
-                // 如果不是首次，添加一个过渡帧
-                if (!previousFrameData.isFirst) {
-                  filteredTimestamps = [[0, previousFrameData.lastTimestamp, 0], ...filteredTimestamps];
-                }
-                
-                // 更新最后时间戳
-                previousFrameData.lastTimestamp = filteredTimestamps[filteredTimestamps.length - 1][1];
-                previousFrameData.isFirst = false;
-              } else {
-                // 没有新帧，可能焦点窗口改变
-                const currentWindow = await getFocusWindow(packageName);
-                if (windowName !== currentWindow) {
-                  // 窗口已改变，重置状态
-                  previousFrameData.isFirst = true;
-                  previousFrameData.lastTimestamp = 0;
-                }
-                
-                return { fps: 0, jank: 0 };
-              }
-            } else {
-              // 首次采集
-              if (filteredTimestamps.length > 0) {
-                previousFrameData.lastTimestamp = filteredTimestamps[filteredTimestamps.length - 1][1];
-                previousFrameData.isFirst = false;
-              }
-            }
-            
-            // 计算FPS和卡顿数
-            if (filteredTimestamps.length > 0) {
-              const results = calculateResults(refreshPeriod, filteredTimestamps);
-              fps = results.fps;
-              jank = results.jank;
-              
-              // 存储帧时间戳
-              previousFrameData.frameTimestamps = filteredTimestamps;
-              previousFrameData.timestamp = currentTime;
-              
-              return { fps, jank };
-            }
-          }
-        }
-      }
-    } catch (error) {
-      console.warn('使用SurfaceFlinger方法获取FPS数据失败:', error);
+    // 获取焦点窗口
+    const windowName = await getFocusWindow(packageName);
+    if (!windowName) {
+      console.warn(`无法获取应用 ${packageName} 的有效窗口`);
+      return { fps: 0, jank: 0 };
+    }
+
+    // 首次采集，清除数据
+    if (previousFrameData.isFirst) {
+      await clearSurfaceFlingerLatencyData(windowName);
+      previousFrameData.isFirst = false;
+      previousFrameData.lastTimestamp = 0; // 初始时间戳为0
+      return { fps: 0, jank: 0 };
     }
     
-    // 如果SurfaceFlinger方法失败，尝试使用gfxinfo
-    try {
-      const cmd = `dumpsys gfxinfo ${packageName}`;
-      const result = await executeCommand(cmd);
-      
-      if (!result || result.trim() === '') {
-        console.warn('无法获取gfxinfo数据');
-        return { fps: 0, jank: 0 };
-      }
-      
-      // 解析gfxinfo输出
-      const { totalFrames, jankFrames, fps: gfxFps } = parseGfxInfo(result);
-      
-      // 更新上一次的数据
-      previousFrameData = {
-        ...previousFrameData,
-        totalFrames,
-        jankFrames,
-        timestamp: currentTime
-      };
-      
-      // 返回计算得到的FPS和卡顿
-      return { 
-        fps: gfxFps, 
-        jank: jankFrames > previousFrameData.jankFrames ? 
-              jankFrames - previousFrameData.jankFrames : 
-              jankFrames 
-      };
-    } catch (error) {
-      console.error('使用gfxinfo方法获取FPS数据失败:', error);
+    // 非首次采集
+    const { refreshPeriod, timestamps } = await getSurfaceFlingerFrameData(windowName, true);
+    // 采集后立即清除数据，为下一次做准备
+    await clearSurfaceFlingerLatencyData(windowName);
+
+    if (!refreshPeriod || !timestamps || timestamps.length < 2) {
+      return { fps: 0, jank: 0 };
     }
     
-    // 如果所有方法都失败，返回0
-    return { fps: 0, jank: 0 };
+    // 过滤掉旧的帧数据，只保留比上次记录的最新时间戳还新的帧
+    let newTimestamps = timestamps;
+    if (previousFrameData.lastTimestamp > 0) {
+      newTimestamps = timestamps.filter(ts => ts[1] > previousFrameData.lastTimestamp);
+    }
+    
+    if (newTimestamps.length < 2) {
+      return { fps: 0, jank: 0 };
+    }
+    
+    // 更新最后的时间戳
+    previousFrameData.lastTimestamp = newTimestamps[newTimestamps.length - 1][1];
+
+    // 使用 calculateResults 计算 FPS 和卡顿
+    const results = calculateResults(refreshPeriod, newTimestamps);
+    
+    return { fps: results.fps, jank: results.jank };
   } catch (error) {
     console.error('采集FPS数据时出错:', error);
     return { fps: 0, jank: 0 };
@@ -548,15 +482,15 @@ export async function collectFps(packageName) {
  * 重置FPS采集器状态
  */
 export function resetFpsCollector() {
+  console.log('重置FPS采集器状态');
   previousFrameData = {
     totalFrames: 0,
     jankFrames: 0,
     timestamp: 0,
     frameTimestamps: [],
-    lastTimestamp: 0,
+    lastTimestamp: 0, // lastTimestamp 也应重置
     isFirst: true
   };
-  console.log('FPS采集器状态已重置');
 }
 
 /**

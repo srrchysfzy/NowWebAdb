@@ -61,7 +61,7 @@ const useScrcpy = () => {
     const useClasses = () => ({
         video: {
             transformOrigin: "center center",
-            touchAction: "none",
+            touchAction: "none"
         },
     });
     const classes = useClasses();

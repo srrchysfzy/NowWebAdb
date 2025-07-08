@@ -106,6 +106,27 @@ const activeTab = ref('overview');
   overflow-y: auto;
 }
 
+/* --- 自定义滚动条样式 --- */
+:deep(.el-tabs__content::-webkit-scrollbar) {
+  width: 6px;
+  background-color: transparent;
+}
+
+:deep(.el-tabs__content::-webkit-scrollbar-track) {
+  background-color: transparent;
+}
+
+:deep(.el-tabs__content::-webkit-scrollbar-thumb) {
+  background-color: #c1c1c1;
+  border-radius: 3px;
+  border: none;
+}
+
+:deep(.el-tabs__content::-webkit-scrollbar-thumb:hover) {
+  background-color: #a8a8a8;
+}
+/* --- 滚动条样式结束 --- */
+
 :deep(.el-tab-pane) {
   /* The pane itself no longer needs card styling */
   height: auto;
