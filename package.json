@@ -31,6 +31,7 @@
     "xterm-addon-fit": "^0.8.0"
   },
   "devDependencies": {
+    "@vitejs/plugin-basic-ssl": "^2.1.0",
     "@vitejs/plugin-vue": "^6.0.0",
     "@yume-chan/fetch-scrcpy-server": "^1.0.0",
     "sass": "^1.89.2",
