@@ -62,13 +62,21 @@
                   <el-option label="5 秒" value="5000" />
                   <el-option label="10 秒" value="10000" />
                 </el-select>
-                <el-button 
+                <el-button
                   type="warning"
                   @click="refreshAppList"
                   :disabled="isLoading || isMonitoring"
                   :loading="isLoading"
                   :icon="Timer"
                 >刷新应用列表
+                </el-button>
+                <el-button
+                  type="success"
+                  @click="getCurrentApp"
+                  :disabled="isLoading"
+                  :loading="isGettingCurrentApp"
+                  :icon="Search"
+                >获取当前应用
                 </el-button>
               </div>
               <div class="setting-item">
@@ -175,6 +183,51 @@
               <template #suffix>°C</template>
             </el-statistic>
           </el-col>
+          <!-- 前台应用信息 -->
+          <el-col :span="24" class="mt-3">
+            <el-card class="foreground-app-card" shadow="never">
+              <template #header>
+                <div class="card-header">
+                  <span class="title">当前前台应用</span>
+                  <el-tag
+                    :type="currentForegroundApp.packageName ? 'success' : 'info'"
+                    size="small"
+                  >
+                    {{ currentForegroundApp.packageName ? '已检测' : '未检测' }}
+                  </el-tag>
+                </div>
+              </template>
+
+              <div v-if="currentForegroundApp.packageName" class="app-details">
+                <div class="detail-row">
+                  <span class="label">应用名称:</span>
+                  <span class="value">{{ currentForegroundApp.appName || '未知' }}</span>
+                </div>
+                <div class="detail-row">
+                  <span class="label">应用类型:</span>
+                  <el-tag
+                    size="small"
+                    :type="currentForegroundApp.isSystemApp ? 'warning' : 'success'"
+                  >
+                    {{ currentForegroundApp.isSystemApp ? '系统应用' : '第三方应用' }}
+                  </el-tag>
+                </div>
+                <div class="detail-row">
+                  <span class="label">包名:</span>
+                  <span class="value">{{ currentForegroundApp.packageName }}</span>
+                </div>
+                <div class="detail-row">
+                  <span class="label">进程ID:</span>
+                  <span class="value">{{ currentForegroundApp.pid || '未知' }}</span>
+                </div>
+              </div>
+
+              <div v-else class="no-app">
+                <span class="no-app-text">未检测到前台应用</span>
+              </div>
+            </el-card>
+          </el-col>
+
           <el-col :span="24" class="data-info mt-2">
             <div class="data-point-info">
               <el-icon><InfoFilled /></el-icon>
@@ -319,13 +372,14 @@ import { ref, onMounted, computed } from 'vue';
 import { usePerformanceStore } from '../../stores/performance';
 import { useDeviceStore } from '../../stores/device';
 import { getInstalledApps, getProcessList } from '../../utils/adbManager';
-import { 
-  initMonitor, 
-  startMonitoring as startMonitoringAPI, 
-  stopMonitoring as stopMonitoringAPI, 
+import {
+  initMonitor,
+  startMonitoring as startMonitoringAPI,
+  stopMonitoring as stopMonitoringAPI,
   setMonitoringInterval
 } from '../../utils/performance/performanceMonitor';
-import { ElMessage } from 'element-plus';
+import { collectForegroundApp } from '../../utils/performance/collectors/foregroundAppCollector';
+import { ElMessage, ElMessageBox } from 'element-plus';
 import { Cpu, Histogram, DataAnalysis, Connection, Odometer, VideoPlay, VideoPause, Download, Menu, Phone, Search, Timer, Clock, InfoFilled, Loading, Refresh } from '@element-plus/icons-vue';
 
 // 导入图表组件
@@ -347,6 +401,7 @@ let durationTimer = null;
 const localMaxDataPoints = ref(300); // 本地状态用于绑定选择器
 const processList = ref([]); // 存储进程列表
 const selectedPid = ref(''); // 选中的进程ID
+const isGettingCurrentApp = ref(false); // 获取当前应用的加载状态
 
 // Store
 const performanceStore = usePerformanceStore();
@@ -383,6 +438,9 @@ const latestTemp = computed(() => {
   return history.length > 0 ? history[history.length - 1] : 0;
 });
 
+// 当前前台应用信息
+const currentForegroundApp = computed(() => performanceStore.currentForegroundAppInfo);
+
 // 方法
 const refreshAppList = async () => {
   isLoading.value = true;
@@ -392,6 +450,94 @@ const refreshAppList = async () => {
     console.error('获取应用列表失败:', error);
   } finally {
     isLoading.value = false;
+  }
+};
+
+// 获取当前前台应用
+const getCurrentApp = async () => {
+  isGettingCurrentApp.value = true;
+  try {
+    const foregroundApp = await collectForegroundApp();
+
+    if (foregroundApp && foregroundApp.packageName) {
+      // 检查是否为系统应用
+      if (foregroundApp.isSystemApp) {
+        // 系统应用提示
+        ElMessageBox.confirm(
+          `检测到当前前台应用为系统内置应用：${foregroundApp.appName || foregroundApp.packageName}。\n\n系统应用的性能数据可能不够准确或有限制。\n\n是否仍要对此应用进行性能监控？`,
+          '系统应用提示',
+          {
+            confirmButtonText: '继续监控',
+            cancelButtonText: '取消',
+            type: 'warning',
+            center: true
+          }
+        ).then(async () => {
+          // 用户选择继续监控
+          await selectAndMonitorApp(foregroundApp);
+        }).catch(() => {
+          // 用户取消
+          ElMessage.info({
+            message: '已取消对系统应用的监控',
+            duration: 2000
+          });
+        });
+      } else {
+        // 第三方应用，直接选择
+        await selectAndMonitorApp(foregroundApp);
+      }
+    } else {
+      ElMessage.warning({
+        message: '未检测到前台应用，请确保设备上有应用正在运行',
+        duration: 3000
+      });
+    }
+  } catch (error) {
+    console.error('获取当前应用失败:', error);
+    ElMessage.error({
+      message: '获取当前应用失败，请检查设备连接',
+      duration: 3000
+    });
+  } finally {
+    isGettingCurrentApp.value = false;
+  }
+};
+
+// 选择并准备监控应用
+const selectAndMonitorApp = async (foregroundApp) => {
+  try {
+    // 检查应用是否在已安装应用列表中
+    const existingApp = installedApps.value.find(app => app.packageName === foregroundApp.packageName);
+
+    if (existingApp) {
+      // 如果应用在列表中，直接选择
+      selectedPackage.value = foregroundApp.packageName;
+      await onAppSelected(foregroundApp.packageName);
+    } else {
+      // 如果应用不在列表中，添加到列表并选择
+      const newApp = {
+        packageName: foregroundApp.packageName,
+        appName: foregroundApp.appName || foregroundApp.packageName
+      };
+      installedApps.value.unshift(newApp);
+      selectedPackage.value = foregroundApp.packageName;
+      await onAppSelected(foregroundApp.packageName);
+    }
+
+    // 成功消息
+    const appType = foregroundApp.isSystemApp ? '系统应用' : '第三方应用';
+    const addedText = existingApp ? '' : '（已添加到应用列表）';
+
+    ElMessage.success({
+      message: `已获取当前前台${appType}: ${foregroundApp.appName || foregroundApp.packageName}${addedText}`,
+      duration: 3000
+    });
+  } catch (error) {
+    console.error('选择应用失败:', error);
+    ElMessage.error({
+      message: '选择应用失败，请重试',
+      duration: 3000
+    });
   }
 };
 
@@ -868,5 +1014,64 @@ onMounted(async () => {
   .action-buttons {
     margin-top: 20px;
   }
+}
+
+/* 前台应用信息卡片样式 */
+.foreground-app-card {
+  border: 1px solid #e4e7ed;
+  border-radius: 8px;
+  background: #fafbfc;
+}
+
+.foreground-app-card .card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 0;
+}
+
+.foreground-app-card .title {
+  font-weight: 600;
+  font-size: 14px;
+  color: #303133;
+}
+
+.app-details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+}
+
+.detail-row .label {
+  font-weight: 500;
+  color: #606266;
+  font-size: 13px;
+  min-width: 70px;
+}
+
+.detail-row .value {
+  color: #303133;
+  font-size: 13px;
+  word-break: break-all;
+  text-align: right;
+  flex: 1;
+  margin-left: 12px;
+}
+
+.no-app {
+  text-align: center;
+  padding: 8px 0;
+}
+
+.no-app-text {
+  color: #909399;
+  font-size: 13px;
 }
 </style> 

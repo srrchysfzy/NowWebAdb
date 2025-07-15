@@ -10,6 +10,7 @@ import { collectMemoryUsage, collectDetailedMemoryUsage } from './collectors/mem
 import { collectBatteryInfo, resetBatteryCollector } from './collectors/batteryCollector';
 import { collectNetworkUsage, resetNetworkCollector } from './collectors/networkCollector';
 import { collectFps, resetFpsCollector } from './collectors/fpsCollector';
+import { collectForegroundApp, resetForegroundAppCollector } from './collectors/foregroundAppCollector';
 
 class PerformanceMonitor {
   constructor() {
@@ -96,6 +97,7 @@ class PerformanceMonitor {
     resetNetworkCollector();
     resetFpsCollector();
     resetBatteryCollector();
+    resetForegroundAppCollector();
     this.dataPointCount = 0;
   }
 
@@ -191,6 +193,7 @@ class PerformanceMonitor {
         collectBatteryInfo(),
         collectNetworkUsage(this.packageName),
         collectFps(this.packageName),
+        collectForegroundApp(),
       ]);
 
       const [
@@ -200,6 +203,7 @@ class PerformanceMonitor {
         batteryResult,
         networkResult,
         fpsResult,
+        foregroundAppResult,
       ] = results;
 
       // 2. 每个采集周期只添加一次时间戳，确保所有数据对齐
@@ -260,6 +264,14 @@ class PerformanceMonitor {
         console.warn('采集FPS数据失败:', fpsResult.reason || '未知错误');
       }
 
+      // --- 前台应用 ---
+      if (foregroundAppResult.status === 'fulfilled' && foregroundAppResult.value) {
+        this.performanceStore.addDataPoint('foregroundApp', foregroundAppResult.value, timestamp, false);
+      } else {
+        this.performanceStore.addDataPoint('foregroundApp', null, timestamp, false);
+        console.warn('采集前台应用数据失败:', foregroundAppResult.reason || '未知错误');
+      }
+
       // 4. 检查数据对齐情况
       this.checkDataAlignment();
 
@@ -279,6 +291,7 @@ class PerformanceMonitor {
       this.performanceStore.addDataPoint('networkTx', null, timestamp, false);
       this.performanceStore.addDataPoint('fps', null, timestamp, false);
       this.performanceStore.addDataPoint('jankCount', null, timestamp, false);
+      this.performanceStore.addDataPoint('foregroundApp', null, timestamp, false);
     }
   }
 

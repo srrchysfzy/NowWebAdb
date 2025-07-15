@@ -42,7 +42,20 @@ export const usePerformanceStore = defineStore('performance', {
     
     // 当前监控的应用PID
     currentPid: null,
-    
+
+    // 当前前台应用信息
+    currentForegroundApp: {
+      packageName: null,
+      activityName: null,
+      appName: null,
+      pid: null,
+      source: null,
+      isSystemApp: false
+    },
+
+    // 前台应用历史数据
+    foregroundAppHistory: [],
+
     // 最大历史数据点数量，0表示不限制
     maxDataPoints: 300,
   }),
@@ -121,6 +134,25 @@ export const usePerformanceStore = defineStore('performance', {
         case 'diskUsage':
           this.addToLimitedArray(this.diskUsageHistory, value);
           break;
+        case 'foregroundApp':
+          // 处理前台应用数据
+          if (value && value.packageName) {
+            // 更新当前前台应用信息
+            this.currentForegroundApp = { ...value };
+
+            // 添加到历史记录（只有当应用发生变化时才添加）
+            const lastApp = this.foregroundAppHistory[this.foregroundAppHistory.length - 1];
+            if (!lastApp || lastApp.packageName !== value.packageName || lastApp.activityName !== value.activityName) {
+              this.addToLimitedArray(this.foregroundAppHistory, {
+                ...value,
+                timestamp: timeString
+              });
+            }
+          } else {
+            // 如果获取失败，保持当前状态不变，但在历史记录中添加null
+            this.addToLimitedArray(this.foregroundAppHistory, null);
+          }
+          break;
       }
     },
     
@@ -153,6 +185,7 @@ export const usePerformanceStore = defineStore('performance', {
       this.jankCountHistory = [];
       this.gpuUsageHistory = [];
       this.diskUsageHistory = [];
+      this.foregroundAppHistory = [];
       this.timeStamps = [];
     },
     
@@ -203,6 +236,20 @@ export const usePerformanceStore = defineStore('performance', {
         : 0;
     },
     
+    /**
+     * 获取当前前台应用信息
+     */
+    currentForegroundAppInfo(state) {
+      return state.currentForegroundApp;
+    },
+
+    /**
+     * 获取前台应用历史记录
+     */
+    foregroundAppHistoryData(state) {
+      return state.foregroundAppHistory;
+    },
+
     /**
      * 获取最近的FPS数据
      */
@@ -269,7 +316,11 @@ export const usePerformanceStore = defineStore('performance', {
           jank: state.jankCountHistory
         },
         gpu: state.gpuUsageHistory,
-        disk: state.diskUsageHistory
+        disk: state.diskUsageHistory,
+        foregroundApp: {
+          current: state.currentForegroundApp,
+          history: state.foregroundAppHistory
+        }
       };
     }
   }
