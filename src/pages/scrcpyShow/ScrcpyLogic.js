@@ -746,7 +746,12 @@ const useScrcpy = () => {
         destroyClient,
         // 新增状态
         connectionStatus,
-        connectionError
+        connectionError,
+        // 设备分辨率
+        deviceRealWidth: () => deviceRealWidth,
+        deviceRealHeight: () => deviceRealHeight,
+        // 坐标转换函数
+        clientPositionToDevicePosition
     };
 };
 

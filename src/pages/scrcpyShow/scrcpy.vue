@@ -13,6 +13,17 @@
         @contextmenu="handleContextMenu"
         @wheel="handleWheel"
       />
+
+      <!-- 浮动坐标窗口 -->
+      <FloatingCoordinateWindow
+        :visible="isCoordinateTrackingActive && isMouseInScreen"
+        :mouse-x="currentMouseX"
+        :mouse-y="currentMouseY"
+        :absolute-x="currentAbsoluteX"
+        :absolute-y="currentAbsoluteY"
+        :device-width="getDeviceRealWidth()"
+        :device-height="getDeviceRealHeight()"
+      />
       <!-- 非全屏模式下的右侧工具栏 -->
       <transition name="sidebar-slide" appear>
         <div class="side-toolbar" v-if="!isLoading && !hasError && !isFullscreen && isSidebarVisible">
@@ -101,13 +112,15 @@ import {useScrcpy} from './ScrcpyLogic.js';
 import DeviceOperateButton from "@/pages/scrcpyShow/components/DeviceOperateButton.vue";
 import DeviceFunctionButton from "@/pages/scrcpyShow/components/DeviceFunctionButton.vue";
 import LoadingScreen from "@/pages/scrcpyShow/components/LoadingScreen.vue";
+import FloatingCoordinateWindow from "@/pages/scrcpyShow/components/FloatingCoordinateWindow.vue";
 import {
-  AndroidKeyCode, 
-  AndroidMotionEventAction, 
-  AndroidMotionEventButton, 
+  AndroidKeyCode,
+  AndroidMotionEventAction,
+  AndroidMotionEventButton,
   ScrcpyPointerId
 } from "@yume-chan/scrcpy";
 import { ArrowUp, ArrowDown } from "@element-plus/icons-vue";
+import { ElMessage } from 'element-plus';
 
 const renderRef = ref();
 const isLoading = ref(true);
@@ -117,6 +130,13 @@ const fullScreenContainer = ref(null);
 const isFullscreen = ref(false);
 // 添加侧边栏显示状态
 const isSidebarVisible = ref(false);
+// 添加坐标跟踪状态
+const isCoordinateTrackingActive = ref(false);
+const isMouseInScreen = ref(false); // 鼠标是否在屏幕内
+const currentMouseX = ref(0);
+const currentMouseY = ref(0);
+const currentAbsoluteX = ref(0);
+const currentAbsoluteY = ref(0);
 
 // 获取所有必要的变量和函数
 const {
@@ -132,10 +152,10 @@ const {
   swapWidthHeight,
   handleKeyEvent,
   handlePointerDown,
-  handlePointerMove,
+  handlePointerMove: originalHandlePointerMove,
   handlePointerUp,
-  handlePointerLeave,
-  handleContextMenu,
+  handlePointerLeave: originalHandlePointerLeave,
+  handleContextMenu: originalHandleContextMenu,
   handleWheel,
   scrcpyStart,
   destroyClient,
@@ -144,12 +164,148 @@ const {
   connectionError,
   // 新增变量
   client,
-  rotation
+  rotation,
+  // 设备分辨率
+  deviceRealWidth: getDeviceRealWidth,
+  deviceRealHeight: getDeviceRealHeight,
+  // 坐标转换函数
+  clientPositionToDevicePosition
 } = useScrcpy();
 
-// 设备真实分辨率变量
-let deviceRealWidth = 1080;
-let deviceRealHeight = 2160;
+// 不再需要这些变量，使用 getDeviceRealWidth() 和 getDeviceRealHeight() 函数
+
+// 自定义鼠标移动处理函数，包装原始函数并添加坐标跟踪功能
+const handlePointerMove = async (event) => {
+  // 更新鼠标位置
+  currentMouseX.value = event.clientX;
+  currentMouseY.value = event.clientY;
+
+  // 如果坐标跟踪模式激活，计算设备坐标
+  if (isCoordinateTrackingActive.value) {
+    // 获取渲染容器的位置和尺寸
+    const container = renderRef.value?.renderContainer;
+    if (container) {
+      const rect = container.getBoundingClientRect();
+
+      // 计算相对于容器的位置
+      const relX = event.clientX - rect.left;
+      const relY = event.clientY - rect.top;
+
+      // 检查鼠标是否在容器范围内
+      const isInBounds = relX >= 0 && relX <= rect.width && relY >= 0 && relY <= rect.height;
+      isMouseInScreen.value = isInBounds;
+
+      if (isInBounds) {
+        // 计算相对于设备的坐标（0-1范围）
+        let pointerViewX = relX / rect.width;
+        let pointerViewY = relY / rect.height;
+
+        // 根据旋转调整坐标
+        let adjustedX = pointerViewX;
+        let adjustedY = pointerViewY;
+
+        // 处理旋转（与 adjustPositionForRotation 保持一致）
+        if (rotation === 1) { // 90度
+          [adjustedX, adjustedY] = [adjustedY, 1 - adjustedX];
+        } else if (rotation === 2) { // 180度
+          adjustedX = 1 - adjustedX;
+          adjustedY = 1 - adjustedY;
+        } else if (rotation === 3) { // 270度
+          [adjustedX, adjustedY] = [1 - adjustedY, adjustedX];
+        }
+
+        // 计算设备上的绝对坐标 - 使用设备真实分辨率
+        const deviceWidth = getDeviceRealWidth();
+        const deviceHeight = getDeviceRealHeight();
+        currentAbsoluteX.value = Math.round(adjustedX * deviceWidth);
+        currentAbsoluteY.value = Math.round(adjustedY * deviceHeight);
+      }
+    }
+  }
+
+  // 调用原始的处理函数
+  await originalHandlePointerMove(event);
+};
+
+// 自定义鼠标离开处理函数
+const handlePointerLeave = async (event) => {
+  // 如果坐标跟踪模式激活，隐藏坐标窗口
+  if (isCoordinateTrackingActive.value) {
+    // 设置鼠标不在屏幕内，这会隐藏坐标窗口
+    isMouseInScreen.value = false;
+  }
+
+  // 调用原始的处理函数
+  await originalHandlePointerLeave(event);
+};
+
+// 自定义右键事件处理函数
+const handleContextMenu = async (event) => {
+  // 如果坐标跟踪模式激活，则复制坐标而不是调用原始处理函数
+  if (isCoordinateTrackingActive.value) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    // 复制相对坐标
+    await copyCoordinatesToClipboard();
+  } else {
+    // 否则调用原始的右键处理函数
+    await originalHandleContextMenu(event);
+  }
+};
+
+// 复制坐标到剪贴板的函数
+const copyCoordinatesToClipboard = async () => {
+  try {
+    const deviceWidth = getDeviceRealWidth();
+    const deviceHeight = getDeviceRealHeight();
+
+    // 计算相对坐标
+    const relativeX = deviceWidth > 0 ? currentAbsoluteX.value / deviceWidth : 0;
+    const relativeY = deviceHeight > 0 ? currentAbsoluteY.value / deviceHeight : 0;
+
+    const relativeCoords = `${relativeX.toFixed(3)}, ${relativeY.toFixed(3)}`;
+
+    await navigator.clipboard.writeText(relativeCoords);
+
+    ElMessage.success({
+      message: `✅ 相对坐标已复制到剪贴板: (${relativeCoords})`,
+      duration: 3000,
+      showClose: true
+    });
+  } catch (error) {
+    console.error('复制到剪贴板失败:', error);
+
+    // 提供备用复制方法
+    try {
+      const deviceWidth = getDeviceRealWidth();
+      const deviceHeight = getDeviceRealHeight();
+      const relativeX = deviceWidth > 0 ? currentAbsoluteX.value / deviceWidth : 0;
+      const relativeY = deviceHeight > 0 ? currentAbsoluteY.value / deviceHeight : 0;
+      const relativeCoords = `${relativeX.toFixed(3)}, ${relativeY.toFixed(3)}`;
+
+      // 尝试使用旧的 execCommand 方法
+      const textArea = document.createElement('textarea');
+      textArea.value = relativeCoords;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+
+      ElMessage.success({
+        message: `✅ 相对坐标已复制到剪贴板: (${relativeCoords})`,
+        duration: 3000,
+        showClose: true
+      });
+    } catch (fallbackError) {
+      ElMessage.error({
+        message: '❌ 复制失败，请手动复制坐标',
+        duration: 3000,
+        showClose: true
+      });
+    }
+  }
+};
 
 const calcWidthAndHeight = computed(() => {
   const [calcWidth, calcHeight] = swapWidthHeight(width.value, height.value)
@@ -249,10 +405,13 @@ const toggleRotate = () => {
 };
 
 const toggleFocus = () => {
-  console.log('切换焦点');
-  // 实现焦点切换功能
-  if (renderRef.value && renderRef.value.renderContainer) {
-    renderRef.value.renderContainer.focus();
+  console.log('切换坐标跟踪模式');
+  isCoordinateTrackingActive.value = !isCoordinateTrackingActive.value;
+
+  if (isCoordinateTrackingActive.value) {
+    console.log('坐标跟踪模式已启用');
+  } else {
+    console.log('坐标跟踪模式已禁用');
   }
 };
 
